@@ -1,0 +1,8 @@
+requests
+google-api-python-client
+google-auth-httplib2
+google-auth-oauthlib
+google-cloud-firestore
+pytz
+flask
+tinydb

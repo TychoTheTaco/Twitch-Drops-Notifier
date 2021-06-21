@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html lang="en">
+    <head>
+        <meta charset="UTF-8">
+        <title>Twitch Drops Notifier</title>
+        <link rel="stylesheet" href="{{ url_for('static', filename='default.css') }}" type="text/css">
+    </head>
+    <body>
+        <h1>Twitch Drops Notifier</h1>
+        <label style="font-size: 14pt;">Enter your email to subscribe to notifications. You will be emailed whenever a new Drop Campaign is
+            found for your selected
+            games.</label>
+
+        <form action="{{url_for('subscribe')}}" method="post" enctype="multipart/form-data">
+
+            <div>
+
+                <!-- Email -->
+                <div style="margin-top: 24px;">
+                    <label for="email_input" class="form-section-header">Email</label>
+                    <br>
+                    <input id="email_input" type="email" name="email">
+                </div>
+
+                <!-- Games -->
+                <div style="margin-top: 24px;">
+                    <label class="form-section-header">Games</label>
+                    <div>
+                        <div style="text-align: start; display: inline-flex; flex-direction: column;">
+                            {% for game in games %}
+                            <div>
+                                <input id="game_{{game.id}}" type="checkbox" name="game_{{game.id}}">
+                                <label for="game_{{game.id}}">{{game.displayName}}</label>
+                            </div>
+                            {% endfor %}
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Timezone -->
+                <div style="margin-top: 24px;">
+                    <label for="timezone_input" class="form-section-header">Timezone</label>
+                    <br>
+                    <label>Drop campaign start and end times will be converted to the selected timezone for your convenience.</label>
+                    <div>
+                        <select id="timezone_input" name="timezone">
+                            {% for timezone in timezones %}
+                            <option value="{{timezone}}">{{timezone}}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                </div>
+
+            </div>
+
+            <button id="submit_button" type="submit" style="margin-top: 16px">Subscribe</button>
+        </form>
+
+    </body>
+</html>

@@ -1,0 +1,41 @@
+:root {
+    --dark-gray: #303030;
+    --purple: #6441a5;
+}
+
+* {
+    color: whitesmoke;
+    font-family: Calibri, sans-serif;
+    user-select: none;
+}
+
+body {
+    background: linear-gradient(180deg, rgba(100, 65, 165, 1) 50%, rgba(252, 118, 70, 1) 100%) fixed;
+    text-align: center;
+}
+
+input {
+    background-color: var(--dark-gray);
+    font-size: 12pt;
+    border: 2px solid whitesmoke;
+    border-radius: 4px;
+}
+
+select {
+    background-color: var(--dark-gray);
+    font-size: 12pt;
+    border: 2px solid whitesmoke;
+    border-radius: 4px;
+}
+
+button {
+    background-color: var(--dark-gray);
+    font-size: 12pt;
+    border: 2px solid whitesmoke;
+    border-radius: 4px;
+}
+
+.form-section-header {
+    font-size: 14pt;
+    font-weight: bold;
+}

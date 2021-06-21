@@ -1,0 +1,8 @@
+# Python virtual environment
+venv
+
+# Credentials
+credentials
+
+# Local database
+database.json
