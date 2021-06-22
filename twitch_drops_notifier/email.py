@@ -59,7 +59,7 @@ class EmailSender:
                     pending_campaigns.append(campaign)
 
             if len(pending_campaigns) > 0:
-                logger.info('Sending new campaigns email to: ' + str(user))
+                logger.info('Sending new campaigns email to: ' + user['email'])
                 try:
                     self._send_new_campaigns_email(user, pending_campaigns)
                 except Exception as e:

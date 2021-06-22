@@ -3,7 +3,7 @@ import json
 import logging
 import argparse
 
-from twitch_drops_watchdog import TwitchDropsWatchdog
+from .twitch_drops_watchdog import TwitchDropsWatchdog
 from .firestore import FirestoreUpdater
 from .email import EmailSender
 from .utils import get_gmail_credentials
