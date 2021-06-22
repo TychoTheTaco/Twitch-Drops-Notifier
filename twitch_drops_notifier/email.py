@@ -65,33 +65,36 @@ class EmailSender:
                 except Exception as e:
                     logger.error('Failed to send email: ' + str(e))
 
-    def _create_edit_and_unsubscribe_footer(self):
+    def _create_edit_and_unsubscribe_footer(self, user):
         domain = 'http://localhost:5000'
-        content = f'<a href="{domain}/edit">Edit Preferences</a> | <a href="{domain}/unsubscribe">Unsubscribe</a>'
+        content = f'<a href="{domain}/edit?id={user["id"]}">Edit Preferences</a> | <a href="{domain}/unsubscribe?id={user["id"]}">Unsubscribe</a>'
+
+        content += '<style></style>'
         return content
 
-    def _send_new_campaigns_email(self, user, campaigns):
-        body = 'Here is a list of new Twitch Drops campaigns:<br><br>'
-        body += format_campaigns_list(user, campaigns)
-        body += self._create_edit_and_unsubscribe_footer()
-
+    def _send(self, to, subject, body):
         message = MIMEText(body, 'html')
-        message['to'] = user['email']
+        message['to'] = to
         message['from'] = 'twitchdropsbot@gmail.com'
-        message['subject'] = 'New Twitch Drops Campaigns!'
+        message['subject'] = subject
         message = {'raw': base64.urlsafe_b64encode(message.as_string().encode('utf-8')).decode('utf-8')}
 
         self._gmail_service.users().messages().send(userId='me', body=message).execute()
+
+    def _send_new_campaigns_email(self, user, campaigns):
+        body = 'Here is a list of new Twitch Drop campaigns:<br><br>'
+        body += format_campaigns_list(user, campaigns)
+        body += self._create_edit_and_unsubscribe_footer(user)
+        self._send(user['email'], 'New Twitch Drop Campaigns!', body)
 
     def send_initial_email(self, user, campaigns):
-        body = 'Active Twitch Drops Campaigns:<br><br>'
+        body = 'Here is a list of currently active Twitch drop campaigns:<br><br>'
         body += format_campaigns_list(user, campaigns)
-        body += self._create_edit_and_unsubscribe_footer()
+        body += self._create_edit_and_unsubscribe_footer(user)
+        self._send(user['email'], 'Active Twitch Drop Campaigns', body)
 
-        message = MIMEText(body, 'html')
-        message['to'] = user['email']
-        message['from'] = 'twitchdropsbot@gmail.com'
-        message['subject'] = 'Active Twitch Drops Campaigns'
-        message = {'raw': base64.urlsafe_b64encode(message.as_string().encode('utf-8')).decode('utf-8')}
-
-        self._gmail_service.users().messages().send(userId='me', body=message).execute()
+    def send_update_email(self, user, campaigns):
+        body = 'You recently updated your preferences. Here is an updated list of active drop campaigns.<br><br>'
+        body += format_campaigns_list(user, campaigns)
+        body += self._create_edit_and_unsubscribe_footer(user)
+        self._send(user['email'], 'Active Twitch Drop Campaigns', body)

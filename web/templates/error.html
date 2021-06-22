@@ -6,9 +6,7 @@
         <link rel="stylesheet" href="{{ url_for('static', filename='default.css') }}" type="text/css">
     </head>
     <body>
-        <h1>Success!</h1>
-        <label style="font-size: 14pt;">You have subscribed to notifications.</label>
-        <br>
-        <button id="submit_button" type="submit" style="margin-top: 16px">Unsubscribe</button>
+        <h1>Error!</h1>
+        <label style="font-size: 14pt;">{{ message }}</label>
     </body>
 </html>

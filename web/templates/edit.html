@@ -11,7 +11,7 @@
             found for your selected
             games.</label>
 
-        <form action="{{ url_for('subscribe') }}" method="post" enctype="multipart/form-data">
+        <form action="{{ url_for('update', id=user.id) }}" method="post" enctype="multipart/form-data">
 
             <div>
 
@@ -19,12 +19,7 @@
                 <div style="margin-top: 24px;">
                     <label for="email_input" class="form-section-header">Email</label>
                     <br>
-                    {% if user is undefined %}
-                        <input id="email_input" type="email" name="email">
-                    {% else %}
-                        <label>{{ user.email }}</label>
-                        <input id="email_input" type="email" name="email" value="{{ user.email }}" hidden>
-                    {% endif %}
+                    <label>{{ user.email }}</label>
                 </div>
 
                 <!-- Games -->
@@ -40,7 +35,7 @@
                                         {% if game_index < games|length %}
                                             <td style="padding: 8px">
                                                 {% set game = games[game_index] %}
-                                                {% if user is defined and game.id in user.games %}
+                                                {% if  game.id in user.games %}
                                                     <input id="game_{{ game.id }}" type="checkbox" name="game_{{ game.id }}" checked>
                                                 {% else %}
                                                     <input id="game_{{ game.id }}" type="checkbox" name="game_{{ game.id }}">
@@ -63,18 +58,10 @@
                     <div>
                         <select id="timezone_input" name="timezone">
                             {% for timezone in timezones %}
-                                {% if user is undefined %}
-                                    {% if timezone == "UTC" %}
-                                        <option value="{{ timezone }}" selected>{{ timezone }}</option>
-                                    {% else %}
-                                        <option value="{{ timezone }}">{{ timezone }}</option>
-                                    {% endif %}
+                                {% if timezone == user.timezone %}
+                                    <option value="{{ timezone }}" selected>{{ timezone }}</option>
                                 {% else %}
-                                    {% if timezone == user.timezone %}
-                                        <option value="{{ timezone }}" selected>{{ timezone }}</option>
-                                    {% else %}
-                                        <option value="{{ timezone }}">{{ timezone }}</option>
-                                    {% endif %}
+                                    <option value="{{ timezone }}">{{ timezone }}</option>
                                 {% endif %}
                             {% endfor %}
                         </select>
@@ -83,13 +70,7 @@
 
             </div>
 
-            <button id="submit_button" type="submit" style="margin-top: 16px">
-                {% if user is undefined %}
-                    Subscribe
-                {% else %}
-                    Update
-                {% endif %}
-            </button>
+            <button id="submit_button" type="submit" style="margin-top: 16px">Update</button>
         </form>
 
     </body>
