@@ -6,3 +6,6 @@ credentials
 
 # Local database
 database.json
+
+# Credentials
+gmail.pickle

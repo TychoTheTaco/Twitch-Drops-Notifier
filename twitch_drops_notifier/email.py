@@ -66,7 +66,7 @@ class EmailSender:
                     logger.error('Failed to send email: ' + str(e))
 
     def _create_edit_and_unsubscribe_footer(self, user):
-        domain = 'http://localhost:5000'
+        domain = 'https://twitch-drops-bot.uw.r.appspot.com/'
         content = f'<a href="{domain}/edit?id={user["id"]}">Edit Preferences</a> | <a href="{domain}/unsubscribe?id={user["id"]}">Unsubscribe</a>'
 
         content += '<style></style>'
