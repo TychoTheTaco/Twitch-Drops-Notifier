@@ -27,7 +27,7 @@ def logging_filter(record):
 # Set up logging
 logger = logging.getLogger(__name__)
 logging.basicConfig(format='%(asctime)s [%(name)s] [%(levelname)s] %(message)s', level=logging.DEBUG, datefmt='%m/%d/%Y %H:%M:%S')
-#logging.getLogger().handlers[0].addFilter(logging_filter)
+logging.getLogger().handlers[0].addFilter(logging_filter)
 
 
 def get_datetime(timestamp):
@@ -79,15 +79,13 @@ if __name__ == '__main__':
 
     def on_snapshot(documents, changes, read):
         for change in changes:
-            print(change.type.name)
             d = change.document.to_dict()
-            print(d)
+            logger.debug('Document change: ' + change.type.name + ' ' + d['email'])
             if change.type.name == 'ADDED':
 
                 # Ignore documents that were created before this script was started
                 created_time = datetime.datetime.fromisoformat(d['created'])
                 if created_time < started_time:
-                    print('skip')
                     continue
 
                 email_sender.send_initial_email(d, get_active_subscribed_games(d))
