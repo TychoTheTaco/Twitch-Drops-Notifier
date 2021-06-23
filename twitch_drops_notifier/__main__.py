@@ -1,7 +1,9 @@
+import datetime
 import json
-
 import logging
 import argparse
+
+from google.cloud import firestore
 
 from .twitch_drops_watchdog import TwitchDropsWatchdog
 from .firestore import FirestoreUpdater
@@ -25,7 +27,25 @@ def logging_filter(record):
 # Set up logging
 logger = logging.getLogger(__name__)
 logging.basicConfig(format='%(asctime)s [%(name)s] [%(levelname)s] %(message)s', level=logging.DEBUG, datefmt='%m/%d/%Y %H:%M:%S')
-logging.getLogger().handlers[0].addFilter(logging_filter)
+#logging.getLogger().handlers[0].addFilter(logging_filter)
+
+
+def get_datetime(timestamp):
+    return datetime.datetime.strptime(timestamp, "%Y-%m-%dT%H:%M:%S%z")
+
+
+def get_active_subscribed_games(user):
+    subscribed_games = []
+    for campaign_document in firestore_client.collection('campaigns').list_documents():
+        campaign = campaign_document.get().to_dict()
+
+        # Ignore campaigns that have already ended
+        if datetime.datetime.now(datetime.timezone.utc) >= get_datetime(campaign['endAt']):
+            continue
+
+        if campaign['game']['id'] in user['games']:
+            subscribed_games.append(campaign)
+    return subscribed_games
 
 
 if __name__ == '__main__':
@@ -53,8 +73,35 @@ if __name__ == '__main__':
     # Get Gmail credentials and create service
     gmail_credentials = get_gmail_credentials('credentials/gmail.pickle', args.gmail_credentials)
 
+    email_sender = EmailSender(gmail_credentials)
+
+    started_time = datetime.datetime.utcnow().replace(tzinfo=datetime.timezone.utc)
+
+    def on_snapshot(documents, changes, read):
+        for change in changes:
+            print(change.type.name)
+            d = change.document.to_dict()
+            print(d)
+            if change.type.name == 'ADDED':
+
+                # Ignore documents that were created before this script was started
+                created_time = datetime.datetime.fromisoformat(d['created'])
+                if created_time < started_time:
+                    print('skip')
+                    continue
+
+                email_sender.send_initial_email(d, get_active_subscribed_games(d))
+
+            elif change.type.name == 'MODIFIED':
+                email_sender.send_update_email(d, get_active_subscribed_games(d))
+            elif change.type.name == 'REMOVED':
+                pass
+
+    firestore_client = firestore.Client()
+    firestore_client.collection('users').on_snapshot(on_snapshot)
+
     # Start bot
     bot = TwitchDropsWatchdog(twitch_credentials)
     bot.add_on_new_campaigns_listener(FirestoreUpdater().on_new_campaigns)
-    bot.add_on_new_campaigns_listener(EmailSender(gmail_credentials).on_new_campaigns)
+    bot.add_on_new_campaigns_listener(email_sender.on_new_campaigns)
     bot.start()

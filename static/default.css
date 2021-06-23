@@ -21,11 +21,17 @@ input {
     border-radius: 4px;
 }
 
+input[type="email"] {
+    padding: 4px;
+    width: 300px;
+}
+
 select {
     background-color: var(--dark-gray);
     font-size: 12pt;
     border: 2px solid whitesmoke;
     border-radius: 4px;
+    padding: 4px;
 }
 
 button {

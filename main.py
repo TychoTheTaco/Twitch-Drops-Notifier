@@ -6,9 +6,6 @@ from google.cloud import firestore
 import pytz
 import uuid
 
-from twitch_drops_notifier.email import EmailSender
-from twitch_drops_notifier.utils import get_gmail_credentials
-
 
 def get_datetime(timestamp):
     return datetime.datetime.strptime(timestamp, "%Y-%m-%dT%H:%M:%S%z")
@@ -17,8 +14,6 @@ def get_datetime(timestamp):
 app = Flask(__name__)
 
 firestore_client = firestore.Client()
-
-email_sender = EmailSender(get_gmail_credentials('gmail.pickle', 'gmail.json'))
 
 
 @app.route('/')
@@ -34,36 +29,6 @@ def index():
     timezones = pytz.common_timezones
 
     return render_template('index.html', games=games, timezones=timezones)
-
-
-def send_initial_email(user):
-    subscribed_games = []
-    for campaign_document in firestore_client.collection('campaigns').list_documents():
-        campaign = campaign_document.get().to_dict()
-
-        # Ignore campaigns that have already ended
-        if datetime.datetime.now(datetime.timezone.utc) >= get_datetime(campaign['endAt']):
-            continue
-
-        if campaign['game']['id'] in user['games']:
-            subscribed_games.append(campaign)
-
-    email_sender.send_initial_email(user, subscribed_games)
-
-
-def send_update_email(user):
-    subscribed_games = []
-    for campaign_document in firestore_client.collection('campaigns').list_documents():
-        campaign = campaign_document.get().to_dict()
-
-        # Ignore campaigns that have already ended
-        if datetime.datetime.now(datetime.timezone.utc) >= get_datetime(campaign['endAt']):
-            continue
-
-        if campaign['game']['id'] in user['games']:
-            subscribed_games.append(campaign)
-
-    email_sender.send_update_email(user, subscribed_games)
 
 
 @app.route('/subscribe', methods=['POST'])
@@ -82,13 +47,11 @@ def subscribe():
         'email': request.form['email'],
         'games': games,
         'timezone': request.form['timezone'],
-        'id': str(uuid.uuid4())
+        'id': str(uuid.uuid4()),
+        'created': datetime.datetime.utcnow().replace(microsecond=0, tzinfo=datetime.timezone.utc).isoformat()
     }
 
     firestore_client.collection('users').document(user['email']).set(user)
-
-    # Send initial email
-    threading.Thread(target=send_initial_email, args=(user,)).start()
 
     return render_template('success.html', message='You have subscribed to notifications!')
 
@@ -117,9 +80,6 @@ def update():
 
     # Update firestore document
     firestore_client.collection('users').document(user['email']).set(user)
-
-    # Send update email
-    threading.Thread(target=send_update_email, args=(user,)).start()
 
     return render_template('success.html', message='Preferences updated!')
 
