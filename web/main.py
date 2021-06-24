@@ -1,10 +1,9 @@
-import threading
 import datetime
+import uuid
 
 from flask import Flask, render_template, request
 from google.cloud import firestore
 import pytz
-import uuid
 
 
 def get_datetime(timestamp):

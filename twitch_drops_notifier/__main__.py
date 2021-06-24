@@ -77,10 +77,12 @@ if __name__ == '__main__':
 
     started_time = datetime.datetime.utcnow().replace(tzinfo=datetime.timezone.utc)
 
-    def on_snapshot(documents, changes, read):
+    firestore_client = firestore.Client()
+
+    def on_users_snapshot(documents, changes, read):
         for change in changes:
             d = change.document.to_dict()
-            logger.debug('Document change: ' + change.type.name + ' ' + d['email'])
+            logger.debug('USER change: ' + change.type.name + ' ' + d['email'])
             if change.type.name == 'ADDED':
 
                 # Ignore documents that were created before this script was started
@@ -95,8 +97,28 @@ if __name__ == '__main__':
             elif change.type.name == 'REMOVED':
                 pass
 
-    firestore_client = firestore.Client()
-    firestore_client.collection('users').on_snapshot(on_snapshot)
+    def on_games_snapshot(documents, changes, read):
+        new_games = []
+        for change in changes:
+            d = change.document.to_dict()
+            logger.debug('GAME change: ' + change.type.name + ' ' + d['displayName'])
+            if change.type.name == 'ADDED':
+
+                # Ignore documents that were created before this script was started
+                created_time = datetime.datetime.fromisoformat(d['created'])
+                if created_time < started_time:
+                    continue
+
+                new_games.append(d)
+
+        if len(new_games) > 0:
+            for document_reference in firestore_client.collection('users').list_documents():
+                email_sender.send_new_games_email(document_reference.get().to_dict(), new_games)
+
+    firestore_client.collection('users').on_snapshot(on_users_snapshot)
+
+    # Listen to game changes
+    firestore_client.collection('games').on_snapshot(on_games_snapshot)
 
     # Start bot
     bot = TwitchDropsWatchdog(twitch_credentials)

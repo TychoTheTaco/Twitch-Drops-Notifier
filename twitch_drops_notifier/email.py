@@ -41,6 +41,14 @@ def format_campaigns_list(user, campaigns):
     return text
 
 
+def format_games_list(user, games):
+    text = ''
+    for game in sorted(games, key=lambda x: x['displayName']):
+        text += f'<b>{game["displayName"]}</b><br>'
+        text += '<br><br>'
+    return text
+
+
 class EmailSender:
 
     def __init__(self, credentials):
@@ -88,13 +96,26 @@ class EmailSender:
         self._send(user['email'], 'New Twitch Drop Campaigns!', body)
 
     def send_initial_email(self, user, campaigns):
-        body = 'Here is a list of currently active Twitch drop campaigns:<br><br>'
-        body += format_campaigns_list(user, campaigns)
+        body = 'Thanks for subscribing! '
+        if len(campaigns) == 0:
+            body += 'There aren\'t any active drop campaigns for the games you selected, but you will be notified when a new one is found.<br><br>'
+        else:
+            body += 'Here is a list of currently active Twitch drop campaigns:<br><br>'
+            body += format_campaigns_list(user, campaigns)
         body += self._create_edit_and_unsubscribe_footer(user)
         self._send(user['email'], 'Active Twitch Drop Campaigns', body)
 
     def send_update_email(self, user, campaigns):
         body = 'You recently updated your preferences. Here is an updated list of active drop campaigns.<br><br>'
-        body += format_campaigns_list(user, campaigns)
+        if len(campaigns) == 0:
+            body += 'No active campaigns.<br><br>'
+        else:
+            body += format_campaigns_list(user, campaigns)
         body += self._create_edit_and_unsubscribe_footer(user)
         self._send(user['email'], 'Active Twitch Drop Campaigns', body)
+
+    def send_new_games_email(self, user, games):
+        body = 'Some new games are available for notifications.<br><br>'
+        body += format_games_list(user, games)
+        body += self._create_edit_and_unsubscribe_footer(user)
+        self._send(user['email'], 'New Games', body)

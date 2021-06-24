@@ -1,4 +1,5 @@
 import logging
+import datetime
 
 
 from google.cloud import firestore
@@ -26,4 +27,5 @@ class FirestoreUpdater:
         logger.info('Updating game database...')
         for campaign in campaigns:
             game = campaign['game']
+            game['created'] = datetime.datetime.utcnow().replace(microsecond=0, tzinfo=datetime.timezone.utc).isoformat()
             self._firestore_client.collection('games').document(game['id']).set(game)
