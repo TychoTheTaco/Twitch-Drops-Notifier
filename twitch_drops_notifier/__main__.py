@@ -104,6 +104,11 @@ if __name__ == '__main__':
             logger.debug('GAME change: ' + change.type.name + ' ' + d['displayName'])
             if change.type.name == 'ADDED':
 
+                if 'created' not in d:
+                    d['created'] = datetime.datetime.utcnow().replace(microsecond=0, tzinfo=datetime.timezone.utc).isoformat()
+                    change.document.reference.set(d)
+                    continue
+
                 # Ignore documents that were created before this script was started
                 created_time = datetime.datetime.fromisoformat(d['created'])
                 if created_time < started_time:
