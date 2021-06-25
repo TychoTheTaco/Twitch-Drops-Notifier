@@ -1,6 +1,6 @@
 :root {
     --dark-gray: #303030;
-    --purple: #6441a5;
+    --purple: #6441A5;
 }
 
 * {
@@ -10,7 +10,7 @@
 }
 
 body {
-    background: linear-gradient(180deg, rgba(100, 65, 165, 1) 50%, rgba(252, 118, 70, 1) 100%) fixed;
+    background: var(--purple);
     text-align: center;
 }
 

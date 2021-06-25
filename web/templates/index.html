@@ -4,93 +4,152 @@
         <meta charset="UTF-8">
         <title>Twitch Drops Notifier</title>
         <link rel="stylesheet" href="{{ url_for('static', filename='default.css') }}" type="text/css">
+
+        <!-- Required styles for Material Web -->
+        <link rel="stylesheet" href="https://unpkg.com/material-components-web@latest/dist/material-components-web.min.css">
+
+        <style>
+            :root {
+                --mdc-theme-primary: #ff6d00;
+                --mdc-theme-secondary: #ff6d00;
+                --mdc-theme-on-primary: whitesmoke;
+                --mdc-theme-on-surface: red;
+            }
+        </style>
+
+        <script src="https://unpkg.com/material-components-web/dist/material-components-web.min.js"></script>
+
     </head>
-    <body>
+    <body style="display: flex; flex-direction: column;">
         <h1>Twitch Drops Notifier</h1>
         <label style="font-size: 14pt;">
-            Enter your email to subscribe to notifications. You will be emailed whenever a new Drop Campaign is found for your selected games.
+            {% if user is none %}
+                Enter your email to subscribe to notifications. You will be emailed whenever a new Drop Campaign is found for your selected games.
+            {% else %}
+                You will be emailed whenever a new Drop Campaign is found for your selected games.
+            {% endif %}
         </label>
 
-        <form action="{{ url_for('subscribe') }}" method="post" enctype="multipart/form-data">
+        <form style="flex: 1;"
+                {% if user is none %}
+              action="{{ url_for('subscribe') }}"
+                {% else %}
+              action="{{ url_for('update', id=user.id) }}"
+                {% endif %}
+              method="post" enctype="multipart/form-data">
 
-            <div>
 
-                <!-- Email -->
-                <div style="margin-top: 24px;">
-                    <label for="email_input" class="form-section-header">Email</label>
-                    <br>
-                    {% if user is undefined %}
-                        <input id="email_input" type="email" name="email">
-                    {% else %}
-                        <label>{{ user.email }}</label>
-                        <input id="email_input" type="email" name="email" value="{{ user.email }}" hidden>
-                    {% endif %}
-                </div>
-
-                <!-- Games -->
-                <div style="margin-top: 24px;">
-                    <label class="form-section-header">Games</label>
-                    <div>
-                        <table style="display: inline-table; text-align: start;">
-                            {% set column_count = 3 %}
-                            {% for i in range(games|length // column_count + 1) %}
-                                <tr>
-                                    {% for j in range(column_count) %}
-                                        {% set game_index = (i * column_count) + j %}
-                                        {% if game_index < games|length %}
-                                            <td style="padding: 8px">
-                                                {% set game = games[game_index] %}
-                                                {% if user is defined and game.id in user.games %}
-                                                    <input id="game_{{ game.id }}" type="checkbox" name="game_{{ game.id }}" checked>
-                                                {% else %}
-                                                    <input id="game_{{ game.id }}" type="checkbox" name="game_{{ game.id }}">
-                                                {% endif %}
-                                                <label for="game_{{ game.id }}">{{ game.displayName }}</label>
-                                            </td>
-                                        {% endif %}
-                                    {% endfor %}
-                                </tr>
-                            {% endfor %}
-                        </table>
-                    </div>
-                </div>
-
-                <!-- Timezone -->
-                <div style="margin-top: 24px;">
-                    <label for="timezone_input" class="form-section-header">Timezone</label>
-                    <br>
-                    <label>Drop campaign start and end times will be converted to the selected timezone for your convenience.</label>
-                    <div>
-                        <select id="timezone_input" name="timezone">
-                            {% for timezone in timezones %}
-                                {% if user is undefined %}
-                                    {% if timezone == "UTC" %}
-                                        <option value="{{ timezone }}" selected>{{ timezone }}</option>
-                                    {% else %}
-                                        <option value="{{ timezone }}">{{ timezone }}</option>
-                                    {% endif %}
-                                {% else %}
-                                    {% if timezone == user.timezone %}
-                                        <option value="{{ timezone }}" selected>{{ timezone }}</option>
-                                    {% else %}
-                                        <option value="{{ timezone }}">{{ timezone }}</option>
-                                    {% endif %}
-                                {% endif %}
-                            {% endfor %}
-                        </select>
-                    </div>
-                </div>
-
+            <!-- Email -->
+            <div style="margin-top: 24px;">
+                <label for="email_input" class="form-section-header">Email</label>
+                <br>
+                <input id="email_input" type="email" name="email"
+                        {% if user is not none %}
+                       value="{{ user.email }}" disabled
+                        {% endif %}
+                >
             </div>
 
-            <button id="submit_button" type="submit" style="margin-top: 16px">
-                {% if user is undefined %}
-                    Subscribe
-                {% else %}
-                    Update
-                {% endif %}
+            <!-- Games -->
+            <div style="margin-top: 24px;">
+                <label class="form-section-header">Games</label>
+                <div>
+                    <table style="display: inline-table; text-align: start;">
+                        {% set column_count = 3 %}
+                        {% for i in range(games|length // column_count + 1) %}
+                            <tr>
+                                {% for j in range(column_count) %}
+                                    {% set game_index = (i * column_count) + j %}
+                                    {% if game_index < games|length %}
+                                        <td style="padding-left: 4px; padding-right: 4px;">
+                                            {% set game = games[game_index] %}
+                                            <div class="mdc-form-field">
+                                                <div class="mdc-checkbox">
+                                                    <input type="checkbox" class="mdc-checkbox__native-control" id="game_{{ game.id }}" name="game_{{ game.id }}"
+                                                            {% if user and game.id in user.games %}
+                                                           checked
+                                                            {% endif %}
+                                                    />
+                                                    <div class="mdc-checkbox__background">
+                                                        <svg class="mdc-checkbox__checkmark"
+                                                             viewBox="0 0 24 24">
+                                                            <path class="mdc-checkbox__checkmark-path" fill="none" d="M1.73,12.91 8.1,19.28 22.79,4.59"></path>
+                                                        </svg>
+                                                        <div class="mdc-checkbox__mixedmark"></div>
+                                                    </div>
+                                                    <div class="mdc-checkbox__ripple"></div>
+                                                </div>
+                                                <label for="game_{{ game.id }}">{{ game.displayName }}</label>
+                                            </div>
+                                        </td>
+                                    {% endif %}
+                                {% endfor %}
+                            </tr>
+                        {% endfor %}
+                    </table>
+                </div>
+            </div>
+
+            <!-- New Game Notifications -->
+            <div style="margin-top: 24px;">
+                <label class="form-section-header">New Game Notifications</label>
+                <br>
+                <div class="mdc-form-field">
+                    <div class="mdc-checkbox">
+                        <input type="checkbox" class="mdc-checkbox__native-control" id="new_game_notifications_input" name="new_game_notifications"
+                                {% if user is none or user.new_game_notifications %}
+                               checked
+                                {% endif %}
+                        />
+                        <div class="mdc-checkbox__background">
+                            <svg class="mdc-checkbox__checkmark"
+                                 viewBox="0 0 24 24">
+                                <path class="mdc-checkbox__checkmark-path" fill="none" d="M1.73,12.91 8.1,19.28 22.79,4.59"></path>
+                            </svg>
+                            <div class="mdc-checkbox__mixedmark"></div>
+                        </div>
+                        <div class="mdc-checkbox__ripple"></div>
+                    </div>
+                    <label for="new_game_notifications_input">Notify me when new games are available.</label>
+                </div>
+            </div>
+
+            <!-- Timezone -->
+            <div style="margin-top: 24px;">
+                <label for="timezone_input" class="form-section-header">Timezone</label>
+                <br>
+                <label>Drop campaign start and end times will be converted to the selected timezone for your convenience.</label>
+                <div>
+                    <select id="timezone_input" name="timezone">
+                        {% for timezone in timezones %}
+                            <option
+                                    value="{{ timezone }}"
+                                    {% if (user is none and timezone == "UTC") or ( user is not none and timezone == user.timezone) %}
+                                    selected
+                                    {% endif %}
+                            >
+                                {{ timezone }}
+                            </option>
+                        {% endfor %}
+                    </select>
+                </div>
+            </div>
+
+            <!-- Subscribe button -->
+            <button class="mdc-button mdc-button--raised" style="margin: 24px;" data-mdc-auto-init="MDCButton">
+                <span class="mdc-button__label">
+                    {% if user is none %}
+                        Subscribe
+                    {% else %}
+                        Update
+                    {% endif %}
+                </span>
             </button>
         </form>
+
+        <script type="text/javascript">
+            window.mdc.autoInit();
+        </script>
 
     </body>
 </html>
