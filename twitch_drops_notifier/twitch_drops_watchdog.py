@@ -1,11 +1,11 @@
 import datetime
 import logging
 import time
-from typing import Callable
 
-from tinydb import TinyDB
+from google.cloud import firestore
 
 from . import twitch
+from . import utils
 
 # Set up logging
 logger = logging.getLogger(__name__)
@@ -18,71 +18,85 @@ def get_datetime(timestamp):
 class TwitchDropsWatchdog:
     """
     This class is used to poll the Twitch API at regular intervals to check for
-    new "Drop Campaigns". Whenever new campaigns are found, they get added to a
-    local database and all attached listeners are called.
+    new "Drop Campaigns".
     """
 
-    def __init__(self, credentials, sleep_delay_seconds: int = 60 * 60 * 1, database_path='database.json'):
+    def __init__(self, twitch_credentials, firestore_client: firestore.Client, sleep_delay_seconds: int = 60 * 60 * 1):
         """
         Creates a new TwitchDropsWatchdog.
-        :param credentials: A dictionary containing the required credentials to use the Twitch API. The following are required:
+        :param twitch_credentials: A dictionary containing the required credentials to use the Twitch API. The following are required:
         {
           "client_id": str,
           "oauth_token": str,
           "channel_login": str
         }
+        :param firestore_client:
         :param sleep_delay_seconds: The number of seconds to wait in between polling the Twitch API. Since new campaigns are not added very
         often, this can be set to a few hours.
-        :param database_path: A path to the local database of campaigns.
         """
-        self._credentials = credentials
+        self._twitch_credentials = twitch_credentials
+        self._firestore_client = firestore_client
         self._sleep_delay_seconds = sleep_delay_seconds
-        self._database = TinyDB(database_path)
 
-        self._on_new_campaigns_listeners = []
+    def _add_or_update_campaign(self, campaign):
+        document_reference = self._firestore_client.collection('campaigns').document(campaign['id'])
+        document_snapshot = document_reference.get()
 
-    @staticmethod
-    def _table_contains(table, item):
-        for x in table:
-            if x == item:
-                return True
-        return False
+        # If this campaign already exists in our database, check if it changed
+        if document_snapshot.exists:
+            before = document_snapshot.to_dict()
+            document_reference.update(campaign)
+            after = document_snapshot.to_dict()
+            if before != after:
+                logger.debug('Campaign details changed! Before: ' + str(before) + ' After: ' + str(after))
+            return
+
+        # Add a 'created' field to the campaign object so we know when it was added to the database
+        campaign['created'] = utils.get_timestamp()
+
+        # Add campaign to database
+        document_reference.set(campaign)
+        logger.info('New campaign: ' + campaign['game']['displayName'] + ' | ' + campaign['name'])
+
+    def _add_or_update_game(self, game):
+        document_reference = self._firestore_client.collection('games').document(game['id'])
+        document_snapshot = document_reference.get()
+
+        # If this game already exists in our database, check if it changed
+        if document_snapshot.exists:
+            before = document_snapshot.to_dict()
+            document_reference.update(game)
+            after = document_snapshot.to_dict()
+            if before != after:
+                logger.debug('Game details changed! Before: ' + str(before) + ' After: ' + str(after))
+            return
+
+        # Add a 'created' field to the game object so we know when it was added to the database
+        game['created'] = utils.get_timestamp()
+
+        # Add game to database
+        document_reference.set(game)
+        logger.info('New game: ' + game['displayName'])
 
     def start(self):
         while True:
 
             # Get all drop campaigns
             logger.info('Updating campaign list...')
-            campaigns = twitch.get_drop_campaigns(self._credentials)
+            campaigns = twitch.get_drop_campaigns(self._twitch_credentials)
             logger.info(f'Found {len(campaigns)} campaigns.')
 
             # Update drop campaign database and find new campaigns
-            new_campaigns = []
             for campaign in campaigns:
 
                 # Ignore campaigns that have already ended
                 if datetime.datetime.now(datetime.timezone.utc) >= get_datetime(campaign['endAt']):
                     continue
 
-                table = self._database.table('campaigns')
-
-                # Ignore campaigns that are already in the database
-                if self._table_contains(table, campaign):
-                    continue
-
-                # Add campaign to database
-                table.insert(campaign)
-                new_campaigns.append(campaign)
-                logger.info('New campaign: ' + campaign['game']['displayName'] + ' | ' + campaign['name'])
-
-            # Notify listeners
-            if len(new_campaigns) > 0:
-                for listener in self._on_new_campaigns_listeners:
-                    listener(list(new_campaigns))
+                # Update database
+                self._add_or_update_campaign(campaign)
+                self._add_or_update_game(campaign['game'])
 
             # Sleep
             logger.info(f'Sleeping for {self._sleep_delay_seconds} seconds...')
             time.sleep(self._sleep_delay_seconds)
-
-    def add_on_new_campaigns_listener(self, callback: Callable):
-        self._on_new_campaigns_listeners.append(callback)

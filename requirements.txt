@@ -5,4 +5,3 @@ google-auth-oauthlib
 google-cloud-firestore
 pytz
 flask
-tinydb
