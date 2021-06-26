@@ -125,6 +125,12 @@ class EmailSender:
             campaign = change.document.to_dict()
             if change.type.name == 'ADDED':
 
+                # Skip campaigns without a 'created' key. They were added before
+                # this script started. This can be removed once all campaigns
+                # have a 'created' key.
+                if 'created' not in campaign:
+                    continue
+
                 # Ignore documents that were created before this script was started
                 if datetime.datetime.fromisoformat(campaign['created']) < self._start_time:
                     continue
