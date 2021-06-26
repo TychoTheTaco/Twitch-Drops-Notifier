@@ -46,7 +46,7 @@ class TwitchDropsWatchdog:
         if document_snapshot.exists:
             before = document_snapshot.to_dict()
             document_reference.update(campaign)
-            after = document_snapshot.to_dict()
+            after = document_reference.get().to_dict()
             if before != after:
                 logger.debug('Campaign details changed! Before: ' + str(before) + ' After: ' + str(after))
             return
@@ -66,7 +66,7 @@ class TwitchDropsWatchdog:
         if document_snapshot.exists:
             before = document_snapshot.to_dict()
             document_reference.update(game)
-            after = document_snapshot.to_dict()
+            after = document_reference.get().to_dict()
             if before != after:
                 logger.debug('Game details changed! Before: ' + str(before) + ' After: ' + str(after))
             return
