@@ -13,6 +13,7 @@
     <option name="TEMPLATE_FOLDERS">
       <list>
         <option value="$MODULE_DIR$/web/templates" />
+        <option value="$MODULE_DIR$/email_templates" />
       </list>
     </option>
   </component>

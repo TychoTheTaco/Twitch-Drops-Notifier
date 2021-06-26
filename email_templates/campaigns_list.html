@@ -1,0 +1,16 @@
+<div>
+    {% for campaign in campaigns %}
+        <div>
+            <b>{{ campaign.game.displayName }}</b> | {{ campaign.name }}
+            <br>
+            Starts: {{ campaign.startAt | convert_time(user) }}
+            <br>
+            Ends : {{ campaign.endAt | convert_time(user) }}
+            <br>
+            <a href="https://www.twitch.tv/directory/game/{{ campaign.game.displayName | urlencode }}?tl=c2542d6d-cd10-4532-919b-3d19f30a768b">Watch now!</a>
+        </div>
+       {% if not loop.last %}
+            <br>
+        {% endif %}
+    {% endfor %}
+</div>

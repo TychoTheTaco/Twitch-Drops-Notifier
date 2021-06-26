@@ -4,4 +4,4 @@ google-auth-httplib2
 google-auth-oauthlib
 google-cloud-firestore
 pytz
-flask
+jinja2

@@ -1,0 +1,24 @@
+<!DOCTYPE html>
+<html lang="en">
+    <head>
+        <meta charset="UTF-8">
+        <title>Twitch Drops Notifier</title>
+    </head>
+    <body>
+        <div>
+            {{ message }}
+        </div>
+        <br>
+        <div>
+            {% if campaigns|length == 0 %}
+                There aren't any active campaigns for the games you selected. You will be notified when a new one is found.
+            {% else %}
+                Here is a list of currently active campaigns:
+                <br><br>
+                {% include 'campaigns_list.html' %}
+            {% endif %}
+        </div>
+        <br>
+        {% include 'footer.html' %}
+    </body>
+</html>

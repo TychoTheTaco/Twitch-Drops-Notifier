@@ -1,12 +1,13 @@
 import base64
 import datetime
-import urllib.parse
 import logging
 from email.mime.text import MIMEText
 
 import pytz
 from googleapiclient.discovery import build
 from google.cloud import firestore
+from jinja2 import Environment, FileSystemLoader
+from jinja2.filters import FILTERS
 
 
 # Set up logging
@@ -17,36 +18,15 @@ def get_datetime(timestamp):
     return datetime.datetime.strptime(timestamp, "%Y-%m-%dT%H:%M:%S%z")
 
 
-def format_campaigns_list(user, campaigns):
-    text = ''
-    for campaign in sorted(campaigns, key=lambda x: get_datetime(x['endAt'])):
-        start_time = get_datetime(campaign['startAt'])
-        end_time = get_datetime(campaign['endAt'])
-
-        # Convert start and end times to user-specified timezone
-        if 'timezone' in user:
-            try:
-                start_time_local = start_time.astimezone(pytz.timezone(user['timezone']))
-                end_time_local = end_time.astimezone(pytz.timezone(user['timezone']))
-                start_time = start_time_local
-                end_time = end_time_local
-            except pytz.exceptions.UnknownTimeZoneError:
-                pass
-
-        text += f'<b>{campaign["game"]["displayName"]}</b><br>{campaign["name"]}<br>'
-        text += 'Starts: ' + start_time.strftime('%d %B %Y %H:%M %Z') + '<br>'
-        text += 'Ends  : ' + end_time.strftime('%d %B %Y %H:%M %Z') + '<br>'
-        text += f'<a href="https://www.twitch.tv/directory/game/{urllib.parse.quote(campaign["game"]["displayName"])}?tl=c2542d6d-cd10-4532-919b-3d19f30a768b">Watch now!</a>'
-        text += '<br><br>'
-    return text
+def convert_time(value, user):
+    try:
+        value = get_datetime(value).astimezone(pytz.timezone(user['timezone']))
+    except pytz.exceptions.UnknownTimeZoneError:
+        pass
+    return value.strftime('%d %B %Y %H:%M %Z')
 
 
-def format_games_list(user, games):
-    text = ''
-    for game in sorted(games, key=lambda x: x['displayName']):
-        text += f'<b>{game["displayName"]}</b><br>'
-        text += '<br><br>'
-    return text
+FILTERS['convert_time'] = convert_time
 
 
 class EmailSender:
@@ -56,6 +36,10 @@ class EmailSender:
         self._firestore_client = firestore_client
 
         self._start_time = datetime.datetime.utcnow().replace(tzinfo=datetime.timezone.utc)
+
+        self._domain = 'https://twitch-drops-bot.uw.r.appspot.com'
+
+        self._jinja_environment = Environment(loader=FileSystemLoader('email_templates'))
 
         # Listen for database changes
         firestore_client.collection('users').on_snapshot(self._on_snapshot_users)
@@ -156,12 +140,6 @@ class EmailSender:
                     except Exception as e:
                         logger.error('Failed to send email: ' + str(e))
 
-    def _create_edit_and_unsubscribe_footer(self, user):
-        domain = 'https://twitch-drops-bot.uw.r.appspot.com'
-        content = f'<a href="{domain}?id={user["id"]}">Edit Preferences</a> | <a href="{domain}/unsubscribe?id={user["id"]}">Unsubscribe</a>'
-        content += '<style></style>'
-        return content
-
     def _send(self, to, subject, body):
         message = MIMEText(body, 'html')
         message['to'] = to
@@ -172,35 +150,38 @@ class EmailSender:
 
     def _send_new_campaigns_email(self, user, campaigns):
         logger.info('Sending new campaigns email to: ' + user['email'])
-        body = 'Here is a list of new Twitch Drop campaigns:<br><br>'
-        body += format_campaigns_list(user, campaigns)
-        body += self._create_edit_and_unsubscribe_footer(user)
+        body = self._jinja_environment.get_template('new_campaigns.html').render(
+            user=user,
+            domain=self._domain,
+            campaigns=campaigns
+        )
         self._send(user['email'], 'New Twitch Drop Campaigns!', body)
 
     def _send_initial_email(self, user, campaigns):
         logger.info('Sending initial email to: ' + user['email'])
-        body = 'Thanks for subscribing! '
-        if len(campaigns) == 0:
-            body += 'There aren\'t any active drop campaigns for the games you selected, but you will be notified when a new one is found.<br><br>'
-        else:
-            body += 'Here is a list of currently active Twitch drop campaigns:<br><br>'
-            body += format_campaigns_list(user, campaigns)
-        body += self._create_edit_and_unsubscribe_footer(user)
+        body = self._jinja_environment.get_template('message_and_campaigns_list.html').render(
+            user=user,
+            domain=self._domain,
+            campaigns=campaigns,
+            message='You have subscribed to Twitch Drop Campaign notifications.'
+        )
         self._send(user['email'], 'Active Twitch Drop Campaigns', body)
 
     def _send_update_email(self, user, campaigns):
         logger.info('Sending update email to: ' + user['email'])
-        body = 'You recently updated your preferences. Here is an updated list of active drop campaigns.<br><br>'
-        if len(campaigns) == 0:
-            body += 'No active campaigns.<br><br>'
-        else:
-            body += format_campaigns_list(user, campaigns)
-        body += self._create_edit_and_unsubscribe_footer(user)
+        body = self._jinja_environment.get_template('message_and_campaigns_list.html').render(
+            user=user,
+            domain=self._domain,
+            campaigns=campaigns,
+            message='You recently updated your preferences.'
+        )
         self._send(user['email'], 'Active Twitch Drop Campaigns', body)
 
     def _send_new_games_email(self, user, games):
         logger.info('Sending new games email to: ' + user['email'])
-        body = 'Some new games are available for notifications.<br><br>'
-        body += format_games_list(user, games)
-        body += self._create_edit_and_unsubscribe_footer(user)
+        body = self._jinja_environment.get_template('new_games.html').render(
+            user=user,
+            domain=self._domain,
+            games=games
+        )
         self._send(user['email'], 'New Games', body)
