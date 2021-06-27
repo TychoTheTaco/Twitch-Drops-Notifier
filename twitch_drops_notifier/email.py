@@ -44,11 +44,11 @@ class EmailSender:
         # Listen for database changes
         firestore_client.collection('users').on_snapshot(self._on_snapshot_users)
         firestore_client.collection('games').on_snapshot(self._on_snapshot_games)
-        firestore_client.collection('campaigns').on_snapshot(self._on_snapshot_campaigns)
+        firestore_client.collection('campaign_details').on_snapshot(self._on_snapshot_campaign_details)
 
     def _get_active_subscribed_games(self, user):
         subscribed_games = []
-        for campaign_document in self._firestore_client.collection('campaigns').list_documents():
+        for campaign_document in self._firestore_client.collection('campaign_details').list_documents():
             campaign = campaign_document.get().to_dict()
 
             # Ignore campaigns that have already ended
@@ -103,7 +103,7 @@ class EmailSender:
                     self._send_new_games_email(user, new_games)
                     pass
 
-    def _on_snapshot_campaigns(self, documents, changes, read):
+    def _on_snapshot_campaign_details(self, documents, changes, read):
         new_campaigns = []
         for change in changes:
             campaign = change.document.to_dict()
