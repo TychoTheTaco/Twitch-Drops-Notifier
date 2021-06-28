@@ -17,8 +17,8 @@ def get_datetime(timestamp):
     return datetime.datetime.strptime(timestamp, "%Y-%m-%dT%H:%M:%S%z")
 
 
-def save_changes(before, after):
-    with open(before['id'] + '.json', 'w') as file:
+def save_changes(before, after, prefix=''):
+    with open(prefix + before['id'] + '.json', 'w') as file:
         d = DeepDiff(before, after)
         pprint(d, file)
 
@@ -57,7 +57,7 @@ class TwitchDropsWatchdog:
             after = document_reference.get().to_dict()
             if before != after:
                 logger.debug('Campaign changed: ' + campaign['game']['displayName'] + ' ' + campaign['id'])
-                save_changes(before, after)
+                save_changes(before, after, 'c_')
             return
 
         # Add a 'created' field to the campaign object so we know when it was added to the database
@@ -78,7 +78,7 @@ class TwitchDropsWatchdog:
             after = document_reference.get().to_dict()
             if before != after:
                 logger.debug('Campaign details changed: ' + campaign['game']['displayName'] + ' ' + campaign['id'])
-                save_changes(before, after)
+                save_changes(before, after, 'cd_')
             return
 
         # Add a 'created' field to the campaign object so we know when it was added to the database
