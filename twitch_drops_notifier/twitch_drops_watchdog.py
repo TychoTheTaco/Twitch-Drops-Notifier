@@ -1,8 +1,10 @@
 import datetime
 import logging
 import time
+from pprint import pprint
 
 from google.cloud import firestore
+from deepdiff import DeepDiff
 
 from . import twitch
 from . import utils
@@ -13,6 +15,12 @@ logger = logging.getLogger(__name__)
 
 def get_datetime(timestamp):
     return datetime.datetime.strptime(timestamp, "%Y-%m-%dT%H:%M:%S%z")
+
+
+def save_changes(before, after):
+    with open(before['id'] + '.json', 'w') as file:
+        d = DeepDiff(before, after)
+        pprint(d, file)
 
 
 class TwitchDropsWatchdog:
@@ -48,7 +56,8 @@ class TwitchDropsWatchdog:
             document_reference.update(campaign)
             after = document_reference.get().to_dict()
             if before != after:
-                logger.debug('Campaign details changed! Before: ' + str(before) + ' After: ' + str(after))
+                logger.debug('Campaign changed: ' + campaign['game']['displayName'] + ' ' + campaign['id'])
+                save_changes(before, after)
             return
 
         # Add a 'created' field to the campaign object so we know when it was added to the database
@@ -68,7 +77,8 @@ class TwitchDropsWatchdog:
             document_reference.update(campaign)
             after = document_reference.get().to_dict()
             if before != after:
-                logger.debug('Campaign details changed! Before: ' + str(before) + ' After: ' + str(after))
+                logger.debug('Campaign details changed: ' + campaign['game']['displayName'] + ' ' + campaign['id'])
+                save_changes(before, after)
             return
 
         # Add a 'created' field to the campaign object so we know when it was added to the database
