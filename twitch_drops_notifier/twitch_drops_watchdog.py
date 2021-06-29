@@ -1,6 +1,7 @@
 import datetime
 import logging
 import time
+import uuid
 from pprint import pprint
 
 from google.cloud import firestore
@@ -71,6 +72,7 @@ class TwitchDropsWatchdog:
             after = document_reference.get().to_dict()
             if before != after:
                 logger.debug('Document data changed!')
+                save_changes(before, after, prefix=f'{before["id"]}_{uuid.uuid4()}')
             return False
 
         # Add a 'created' field to the document so we know when it was added to the database
