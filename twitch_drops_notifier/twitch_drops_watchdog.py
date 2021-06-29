@@ -70,7 +70,7 @@ class TwitchDropsWatchdog:
             document_reference.update(data)
             after = document_reference.get().to_dict()
             if before != after:
-                logger.debug('Document data changed! Before: ' + str(before) + ' After: ' + str(after))
+                logger.debug('Document data changed!')
             return False
 
         # Add a 'created' field to the document so we know when it was added to the database
