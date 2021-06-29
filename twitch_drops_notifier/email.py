@@ -9,6 +9,8 @@ from google.cloud import firestore
 from jinja2 import Environment, FileSystemLoader
 from jinja2.filters import FILTERS
 
+from .twitch_drops_watchdog import TwitchDropsWatchdog
+
 
 # Set up logging
 logger = logging.getLogger(__name__)
@@ -31,7 +33,7 @@ FILTERS['convert_time'] = convert_time
 
 class EmailSender:
 
-    def __init__(self, gmail_credentials, firestore_client: firestore.Client):
+    def __init__(self, gmail_credentials, firestore_client: firestore.Client, watchdog: TwitchDropsWatchdog):
         self._gmail_service = build('gmail', 'v1', credentials=gmail_credentials)
         self._firestore_client = firestore_client
 
@@ -43,8 +45,9 @@ class EmailSender:
 
         # Listen for database changes
         firestore_client.collection('users').on_snapshot(self._on_snapshot_users)
-        firestore_client.collection('games').on_snapshot(self._on_snapshot_games)
-        firestore_client.collection('campaign_details').on_snapshot(self._on_snapshot_campaign_details)
+
+        watchdog.add_on_new_games_listener(self._on_new_games)
+        watchdog.add_on_new_campaign_details_listener(self._on_new_campaign_details)
 
     def _get_active_subscribed_games(self, user):
         subscribed_games = []
@@ -82,63 +85,30 @@ class EmailSender:
 
                 logger.debug('User removed: ' + user['email'])
 
-    def _on_snapshot_games(self, documents, changes, read):
-        new_games = []
-        for change in changes:
-            game = change.document.to_dict()
-            if change.type.name == 'ADDED':
-
-                # Ignore documents that were created before this script was started
-                if datetime.datetime.fromisoformat(game['created']) < self._start_time:
-                    continue
-
-                logger.debug('Game added: ' + game['displayName'])
-                new_games.append(game)
-
+    def _on_new_games(self, games):
         # Send new game emails
-        if len(new_games) > 0:
-            for snapshot in self._firestore_client.collection('users').stream():
-                user = snapshot.to_dict()
-                if user.get('new_game_notifications', True):
-                    self._send_new_games_email(user, new_games)
-                    pass
+        for snapshot in self._firestore_client.collection('users').stream():
+            user = snapshot.to_dict()
+            if user.get('new_game_notifications', True):
+                self._send_new_games_email(user, games)
 
-    def _on_snapshot_campaign_details(self, documents, changes, read):
-        new_campaigns = []
-        for change in changes:
-            campaign = change.document.to_dict()
-            if change.type.name == 'ADDED':
-
-                # Skip campaigns without a 'created' key. They were added before
-                # this script started. This can be removed once all campaigns
-                # have a 'created' key.
-                if 'created' not in campaign:
-                    continue
-
-                # Ignore documents that were created before this script was started
-                if datetime.datetime.fromisoformat(campaign['created']) < self._start_time:
-                    continue
-
-                logger.debug('Campaign added: ' + campaign['game']['displayName'] + ' ' + campaign['name'])
-                new_campaigns.append(campaign)
-
+    def _on_new_campaign_details(self, campaigns):
         # Send new campaign emails
-        if len(new_campaigns) > 0:
-            for snapshot in self._firestore_client.collection('users').stream():
-                user = snapshot.to_dict()
+        for snapshot in self._firestore_client.collection('users').stream():
+            user = snapshot.to_dict()
 
-                # Get campaigns that the user is subscribed to
-                subscribed_campaigns = []
-                for campaign in new_campaigns:
-                    if len(user['games']) == 0 or campaign['game']['id'] in user['games']:
-                        subscribed_campaigns.append(campaign)
+            # Get campaigns that the user is subscribed to
+            subscribed_campaigns = []
+            for campaign in campaigns:
+                if len(user['games']) == 0 or campaign['game']['id'] in user['games']:
+                    subscribed_campaigns.append(campaign)
 
-                # Send new campaigns email
-                if len(subscribed_campaigns) > 0:
-                    try:
-                        self._send_new_campaigns_email(user, subscribed_campaigns)
-                    except Exception as e:
-                        logger.error('Failed to send email: ' + str(e))
+            # Send new campaigns email
+            if len(subscribed_campaigns) > 0:
+                try:
+                    self._send_new_campaigns_email(user, subscribed_campaigns)
+                except Exception as e:
+                    logger.error('Failed to send email: ' + str(e))
 
     def _send(self, to, subject, body):
         message = MIMEText(body, 'html')

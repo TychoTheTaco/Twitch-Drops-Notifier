@@ -60,8 +60,11 @@ if __name__ == '__main__':
 
     firestore_client = firestore.Client()
 
-    email_sender = EmailSender(gmail_credentials, firestore_client)
+    # Create watchdog
+    watchdog = TwitchDropsWatchdog(twitch_credentials, firestore_client, sleep_delay_seconds=args.sleep_delay)
 
-    # Start bot
-    bot = TwitchDropsWatchdog(twitch_credentials, firestore_client, sleep_delay_seconds=args.sleep_delay)
-    bot.start()
+    # Create email sender
+    email_sender = EmailSender(gmail_credentials, firestore_client, watchdog)
+
+    # Start watchdog
+    watchdog.start()

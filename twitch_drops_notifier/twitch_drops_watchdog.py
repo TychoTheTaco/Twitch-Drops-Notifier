@@ -32,81 +32,60 @@ class TwitchDropsWatchdog:
     def __init__(self, twitch_credentials, firestore_client: firestore.Client, sleep_delay_seconds: int = 60 * 60 * 1):
         """
         Creates a new TwitchDropsWatchdog.
-        :param twitch_credentials: A dictionary containing the required credentials to use the Twitch API. The following are required:
+        :param twitch_credentials: A dictionary containing the required
+        credentials to use the Twitch API. The following are required:
         {
           "client_id": str,
           "oauth_token": str,
           "channel_login": str
         }
         :param firestore_client:
-        :param sleep_delay_seconds: The number of seconds to wait in between polling the Twitch API. Since new campaigns are not added very
-        often, this can be set to a few hours.
+        :param sleep_delay_seconds: The number of seconds to wait in between
+        polling the Twitch API. Since new campaigns are not added very often,
+        this can be set to a few hours.
         """
         self._twitch_credentials = twitch_credentials
         self._firestore_client = firestore_client
         self._sleep_delay_seconds = sleep_delay_seconds
 
+        self._on_new_campaigns_listeners = []
+        self._on_new_campaign_details_listeners = []
+        self._on_new_games_listeners = []
+
     def _add_or_update_campaign(self, campaign):
-        document_reference = self._firestore_client.collection('campaigns').document(campaign['id'])
-        document_snapshot = document_reference.get()
-
-        # If this campaign already exists in our database, check if it changed
-        if document_snapshot.exists:
-            before = document_snapshot.to_dict()
-            document_reference.update(campaign)
-            after = document_reference.get().to_dict()
-            if before != after:
-                logger.debug('Campaign changed: ' + campaign['game']['displayName'] + ' ' + campaign['id'])
-                save_changes(before, after, 'c_')
-            return
-
-        # Add a 'created' field to the campaign object so we know when it was added to the database
-        campaign['created'] = utils.get_timestamp()
-
-        # Add campaign to database
-        document_reference.set(campaign)
-        logger.info('New campaign: ' + campaign['game']['displayName'] + ' | ' + campaign['name'])
+        return self._add_or_update_document(self._firestore_client.collection('campaigns').document(campaign['id']), campaign)
 
     def _add_or_update_campaign_details(self, campaign):
-        document_reference = self._firestore_client.collection('campaign_details').document(campaign['id'])
-        document_snapshot = document_reference.get()
-
-        # If this campaign already exists in our database, check if it changed
-        if document_snapshot.exists:
-            before = document_snapshot.to_dict()
-            document_reference.update(campaign)
-            after = document_reference.get().to_dict()
-            if before != after:
-                logger.debug('Campaign details changed: ' + campaign['game']['displayName'] + ' ' + campaign['id'])
-                save_changes(before, after, 'cd_')
-            return
-
-        # Add a 'created' field to the campaign object so we know when it was added to the database
-        campaign['created'] = utils.get_timestamp()
-
-        # Add campaign to database
-        document_reference.set(campaign)
-        logger.info('New campaign details: ' + campaign['game']['displayName'] + ' | ' + campaign['name'])
+        return self._add_or_update_document(self._firestore_client.collection('campaign_details').document(campaign['id']), campaign)
 
     def _add_or_update_game(self, game):
-        document_reference = self._firestore_client.collection('games').document(game['id'])
+        return self._add_or_update_document(self._firestore_client.collection('games').document(game['id']), game)
+
+    def _add_or_update_document(self, document_reference, data):
         document_snapshot = document_reference.get()
 
-        # If this game already exists in our database, check if it changed
+        # If this document already exists in our database, check if it changed
         if document_snapshot.exists:
             before = document_snapshot.to_dict()
-            document_reference.update(game)
+            document_reference.update(data)
             after = document_reference.get().to_dict()
             if before != after:
-                logger.debug('Game details changed! Before: ' + str(before) + ' After: ' + str(after))
-            return
+                logger.debug('Document data changed! Before: ' + str(before) + ' After: ' + str(after))
+            return False
 
-        # Add a 'created' field to the game object so we know when it was added to the database
-        game['created'] = utils.get_timestamp()
+        # Add a 'created' field to the document so we know when it was added to the database
+        data['created'] = utils.get_timestamp()
 
-        # Add game to database
-        document_reference.set(game)
-        logger.info('New game: ' + game['displayName'])
+        # Add document to database
+        document_reference.set(data)
+        return True
+
+    def _call_all(self, callables, parameters):
+        for f in callables:
+            try:
+                f(parameters)
+            except Exception as e:
+                logger.exception('Exception occurred while calling listener!', exc_info=e)
 
     def start(self):
         while True:
@@ -118,6 +97,9 @@ class TwitchDropsWatchdog:
 
             # Update drop campaign database and find new campaigns
             logger.info('Updating database...')
+            new_campaigns = []
+            new_campaign_details = []
+            new_games = []
             for campaign in campaigns:
 
                 # Ignore campaigns that have already ended
@@ -128,10 +110,34 @@ class TwitchDropsWatchdog:
                 campaign_details = twitch.get_drop_campaign_details(self._twitch_credentials, [campaign['id']])[0]
 
                 # Update database
-                self._add_or_update_campaign(campaign)
-                self._add_or_update_campaign_details(campaign_details)
-                self._add_or_update_game(campaign['game'])
+                if self._add_or_update_campaign(campaign):
+                    new_campaigns.append(campaign)
+                    logger.info('New campaign: ' + campaign['game']['displayName'] + ' ' + campaign['name'])
+                if self._add_or_update_campaign_details(campaign_details):
+                    new_campaign_details.append(campaign_details)
+                    logger.info('New campaign details: ' + campaign['game']['displayName'] + ' ' + campaign['name'])
+                game = campaign['game']
+                if self._add_or_update_game(game):
+                    new_games.append(game)
+                    logger.info('New game: ' + game['displayName'])
+
+                # Notify listeners
+                if len(new_campaigns) > 0:
+                    self._call_all(self._on_new_campaigns_listeners, list(new_campaigns))
+                if len(new_campaign_details) > 0:
+                    self._call_all(self._on_new_campaign_details_listeners, list(new_campaign_details))
+                if len(new_games) > 0:
+                    self._call_all(self._on_new_games_listeners, list(new_games))
 
             # Sleep
             logger.info(f'Sleeping for {self._sleep_delay_seconds} seconds...')
             time.sleep(self._sleep_delay_seconds)
+
+    def add_on_new_campaigns_listener(self, listener):
+        self._on_new_campaigns_listeners.append(listener)
+
+    def add_on_new_campaign_details_listener(self, listener):
+        self._on_new_campaign_details_listeners.append(listener)
+
+    def add_on_new_games_listener(self, listener):
+        self._on_new_games_listeners.append(listener)
