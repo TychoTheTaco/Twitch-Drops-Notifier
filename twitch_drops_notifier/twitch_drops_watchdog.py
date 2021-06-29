@@ -121,13 +121,13 @@ class TwitchDropsWatchdog:
                     new_games.append(game)
                     logger.info('New game: ' + game['displayName'])
 
-                # Notify listeners
-                if len(new_campaigns) > 0:
-                    self._call_all(self._on_new_campaigns_listeners, list(new_campaigns))
-                if len(new_campaign_details) > 0:
-                    self._call_all(self._on_new_campaign_details_listeners, list(new_campaign_details))
-                if len(new_games) > 0:
-                    self._call_all(self._on_new_games_listeners, list(new_games))
+            # Notify listeners
+            if len(new_campaigns) > 0:
+                self._call_all(self._on_new_campaigns_listeners, list(new_campaigns))
+            if len(new_campaign_details) > 0:
+                self._call_all(self._on_new_campaign_details_listeners, list(new_campaign_details))
+            if len(new_games) > 0:
+                self._call_all(self._on_new_games_listeners, list(new_games))
 
             # Sleep
             logger.info(f'Sleeping for {self._sleep_delay_seconds} seconds...')
