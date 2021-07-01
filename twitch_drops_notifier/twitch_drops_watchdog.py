@@ -1,11 +1,8 @@
 import datetime
 import logging
 import time
-import uuid
-from pprint import pprint
 
 from google.cloud import firestore
-from deepdiff import DeepDiff
 
 from . import twitch
 from . import utils
@@ -16,12 +13,6 @@ logger = logging.getLogger(__name__)
 
 def get_datetime(timestamp):
     return datetime.datetime.strptime(timestamp, "%Y-%m-%dT%H:%M:%S%z")
-
-
-def save_changes(before, after, prefix=''):
-    with open(prefix + before['id'] + '.json', 'w') as file:
-        d = DeepDiff(before, after)
-        pprint(d, file)
 
 
 class TwitchDropsWatchdog:
@@ -72,7 +63,6 @@ class TwitchDropsWatchdog:
             after = document_reference.get().to_dict()
             if before != after:
                 logger.debug('Document data changed!')
-                save_changes(before, after, prefix=f'{before["id"]}_{uuid.uuid4()}')
             return False
 
         # Add a 'created' field to the document so we know when it was added to the database
