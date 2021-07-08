@@ -55,16 +55,13 @@ if __name__ == '__main__':
     with open(args.twitch_credentials, 'r') as file:
         twitch_credentials = json.load(file)
 
-    # Get Gmail credentials and create service
-    gmail_credentials = get_gmail_credentials('credentials/gmail.pickle', args.gmail_credentials)
-
     firestore_client = firestore.Client()
 
     # Create watchdog
     watchdog = TwitchDropsWatchdog(twitch_credentials, firestore_client, sleep_delay_seconds=args.sleep_delay)
 
     # Create email sender
-    email_sender = EmailSender(gmail_credentials, firestore_client, watchdog)
+    email_sender = EmailSender(args.gmail_credentials, firestore_client, watchdog)
 
     # Start watchdog
     watchdog.start()

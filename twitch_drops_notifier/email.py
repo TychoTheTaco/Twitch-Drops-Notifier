@@ -8,8 +8,10 @@ from googleapiclient.discovery import build
 from google.cloud import firestore
 from jinja2 import Environment, FileSystemLoader
 from jinja2.filters import FILTERS
+from google.auth.transport.requests import Request
 
 from .twitch_drops_watchdog import TwitchDropsWatchdog
+from . import utils
 
 
 # Set up logging
@@ -34,7 +36,9 @@ FILTERS['convert_time'] = convert_time
 class EmailSender:
 
     def __init__(self, gmail_credentials, firestore_client: firestore.Client, watchdog: TwitchDropsWatchdog):
-        self._gmail_service = build('gmail', 'v1', credentials=gmail_credentials)
+        self._gmail_credentials = gmail_credentials
+        self._creds = utils.get_gmail_credentials(gmail_credentials)
+
         self._firestore_client = firestore_client
 
         self._start_time = datetime.datetime.utcnow().replace(tzinfo=datetime.timezone.utc)
@@ -74,12 +78,18 @@ class EmailSender:
                 logger.debug('User added: ' + user['email'])
 
                 # Send initial email
-                self._send_initial_email(user, self._get_active_subscribed_games(user))
+                try:
+                    self._send_initial_email(user, self._get_active_subscribed_games(user))
+                except Exception as e:
+                    logger.error('Failed to send email: ' + str(e))
 
             elif change.type.name == 'MODIFIED':
 
                 logger.debug('User modified: ' + user['email'])
-                self._send_update_email(user, self._get_active_subscribed_games(user))
+                try:
+                    self._send_update_email(user, self._get_active_subscribed_games(user))
+                except Exception as e:
+                    logger.error('Failed to send email: ' + str(e))
 
             elif change.type.name == 'REMOVED':
 
@@ -90,7 +100,10 @@ class EmailSender:
         for snapshot in self._firestore_client.collection('users').stream():
             user = snapshot.to_dict()
             if user.get('new_game_notifications', True):
-                self._send_new_games_email(user, games)
+                try:
+                    self._send_new_games_email(user, games)
+                except Exception as e:
+                    logger.error('Failed to send email: ' + str(e))
 
     def _on_new_campaign_details(self, campaigns):
         # Send new campaign emails
@@ -116,7 +129,16 @@ class EmailSender:
         message['from'] = 'twitchdropsbot@gmail.com'
         message['subject'] = subject
         message = {'raw': base64.urlsafe_b64encode(message.as_string().encode('utf-8')).decode('utf-8')}
-        self._gmail_service.users().messages().send(userId='me', body=message).execute()
+
+        if not self._creds.valid:
+            if self._creds.expired and self._creds.refresh_token:
+                self._creds.refresh(Request())
+            else:
+                logger.error('GMAIL TOKEN COULD NOT BE REFRESHED')
+                exit(1)
+
+        service = build('gmail', 'v1', credentials=self._creds)
+        service.users().messages().send(userId='me', body=message).execute()
 
     def _send_new_campaigns_email(self, user, campaigns):
         logger.info('Sending new campaigns email to: ' + user['email'])
