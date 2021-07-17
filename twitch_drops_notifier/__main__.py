@@ -44,6 +44,10 @@ if __name__ == '__main__':
                         help='The path to the credentials for the Gmail account used to send email notifications.',
                         dest='gmail_credentials',
                         default='gmail.json')
+    parser.add_argument('--google-credentials',
+                        help='The path to the credentials for Google',
+                        dest='google_credentials',
+                        default='google.json')
     parser.add_argument('--sleep-delay',
                         help='The number of seconds to wait in between requests for new drop campaigns.',
                         dest='sleep_delay',
@@ -61,7 +65,7 @@ if __name__ == '__main__':
     watchdog = TwitchDropsWatchdog(twitch_credentials, firestore_client, sleep_delay_seconds=args.sleep_delay)
 
     # Create email sender
-    email_sender = EmailSender(args.gmail_credentials, firestore_client, watchdog)
+    email_sender = EmailSender(args.gmail_credentials, args.google_credentials, firestore_client, watchdog)
 
     # Start watchdog
     watchdog.start()
