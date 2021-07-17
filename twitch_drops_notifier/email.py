@@ -133,6 +133,7 @@ class EmailSender:
         if not self._creds.valid:
             if self._creds.expired and self._creds.refresh_token:
                 self._creds.refresh(Request())
+                logger.info('GMAIL TOKEN REFRESHED')
             else:
                 logger.error('GMAIL TOKEN COULD NOT BE REFRESHED')
                 exit(1)
