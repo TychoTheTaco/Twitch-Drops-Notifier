@@ -37,7 +37,7 @@ class EmailSender:
 
     def __init__(self, gmail_credentials, google_credentials, firestore_client: firestore.Client, watchdog: TwitchDropsWatchdog):
         self._gmail_credentials = gmail_credentials
-        self._creds = utils.get_gmail_credentials(gmail_credentials, google_credentials)
+        self._creds = utils.get_gmail_credentials(gmail_credentials, 'token.json')
 
         self._firestore_client = firestore_client
 
