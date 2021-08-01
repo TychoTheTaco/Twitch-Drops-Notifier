@@ -35,7 +35,7 @@ FILTERS['convert_time'] = convert_time
 
 class EmailSender:
 
-    def __init__(self, gmail_credentials, google_credentials, firestore_client: firestore.Client, watchdog: TwitchDropsWatchdog):
+    def __init__(self, gmail_credentials, firestore_client: firestore.Client, watchdog: TwitchDropsWatchdog):
         self._gmail_credentials = gmail_credentials
         self._creds = utils.get_gmail_credentials(gmail_credentials, 'token.json')
 
