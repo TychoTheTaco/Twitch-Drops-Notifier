@@ -40,12 +40,8 @@ class TwitchDropsWatchdog:
         self._firestore_client = firestore_client
         self._sleep_delay_seconds = sleep_delay_seconds
 
-        self._on_new_campaigns_listeners = []
         self._on_new_campaign_details_listeners = []
         self._on_new_games_listeners = []
-
-    def _add_or_update_campaign(self, campaign):
-        return self._add_or_update_document(self._firestore_client.collection('campaigns').document(campaign['id']), campaign)
 
     def _add_or_update_campaign_details(self, campaign):
         return self._add_or_update_document(self._firestore_client.collection('campaign_details').document(campaign['id']), campaign)
@@ -89,7 +85,6 @@ class TwitchDropsWatchdog:
 
             # Update drop campaign database and find new campaigns
             logger.info('Updating database...')
-            new_campaigns = []
             new_campaign_details = []
             new_games = []
             for campaign in campaigns:
@@ -102,9 +97,6 @@ class TwitchDropsWatchdog:
                 campaign_details = twitch.get_drop_campaign_details(self._twitch_credentials, [campaign['id']])[0]
 
                 # Update database
-                if self._add_or_update_campaign(campaign):
-                    new_campaigns.append(campaign)
-                    logger.info('New campaign: ' + campaign['game']['displayName'] + ' ' + campaign['name'])
                 if self._add_or_update_campaign_details(campaign_details):
                     new_campaign_details.append(campaign_details)
                     logger.info('New campaign details: ' + campaign['game']['displayName'] + ' ' + campaign['name'])
@@ -114,8 +106,6 @@ class TwitchDropsWatchdog:
                     logger.info('New game: ' + game['displayName'])
 
             # Notify listeners
-            if len(new_campaigns) > 0:
-                self._call_all(self._on_new_campaigns_listeners, list(new_campaigns))
             if len(new_campaign_details) > 0:
                 self._call_all(self._on_new_campaign_details_listeners, list(new_campaign_details))
             if len(new_games) > 0:
@@ -124,9 +114,6 @@ class TwitchDropsWatchdog:
             # Sleep
             logger.info(f'Sleeping for {self._sleep_delay_seconds} seconds...')
             time.sleep(self._sleep_delay_seconds)
-
-    def add_on_new_campaigns_listener(self, listener):
-        self._on_new_campaigns_listeners.append(listener)
 
     def add_on_new_campaign_details_listener(self, listener):
         self._on_new_campaign_details_listeners.append(listener)
