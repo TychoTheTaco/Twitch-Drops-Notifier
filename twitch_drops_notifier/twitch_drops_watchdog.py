@@ -78,38 +78,42 @@ class TwitchDropsWatchdog:
     def start(self):
         while True:
 
-            # Get all drop campaigns
-            logger.info('Updating campaign list...')
-            campaigns = twitch.get_drop_campaigns(self._twitch_credentials)
-            logger.info(f'Found {len(campaigns)} campaigns.')
+            try:
 
-            # Update drop campaign database and find new campaigns
-            logger.info('Updating database...')
-            new_campaign_details = []
-            new_games = []
-            for campaign in campaigns:
+                # Get all drop campaigns
+                logger.info('Updating campaign list...')
+                campaigns = twitch.get_drop_campaigns(self._twitch_credentials)
+                logger.info(f'Found {len(campaigns)} campaigns.')
 
-                # Ignore campaigns that have already ended
-                if datetime.datetime.now(datetime.timezone.utc) >= get_datetime(campaign['endAt']):
-                    continue
+                # Update drop campaign database and find new campaigns
+                logger.info('Updating database...')
+                new_campaign_details = []
+                new_games = []
+                for campaign in campaigns:
 
-                # Get campaign details
-                campaign_details = twitch.get_drop_campaign_details(self._twitch_credentials, [campaign['id']])[0]
+                    # Ignore campaigns that have already ended
+                    if datetime.datetime.now(datetime.timezone.utc) >= get_datetime(campaign['endAt']):
+                        continue
 
-                # Update database
-                if self._add_or_update_campaign_details(campaign_details):
-                    new_campaign_details.append(campaign_details)
-                    logger.info('New campaign details: ' + campaign['game']['displayName'] + ' ' + campaign['name'])
-                game = campaign['game']
-                if self._add_or_update_game(game):
-                    new_games.append(game)
-                    logger.info('New game: ' + game['displayName'])
+                    # Get campaign details
+                    campaign_details = twitch.get_drop_campaign_details(self._twitch_credentials, [campaign['id']])[0]
 
-            # Notify listeners
-            if len(new_campaign_details) > 0:
-                self._call_all(self._on_new_campaign_details_listeners, list(new_campaign_details))
-            if len(new_games) > 0:
-                self._call_all(self._on_new_games_listeners, list(new_games))
+                    # Update database
+                    if self._add_or_update_campaign_details(campaign_details):
+                        new_campaign_details.append(campaign_details)
+                        logger.info('New campaign details: ' + campaign['game']['displayName'] + ' ' + campaign['name'])
+                    game = campaign['game']
+                    if self._add_or_update_game(game):
+                        new_games.append(game)
+                        logger.info('New game: ' + game['displayName'])
+
+                # Notify listeners
+                if len(new_campaign_details) > 0:
+                    self._call_all(self._on_new_campaign_details_listeners, list(new_campaign_details))
+                if len(new_games) > 0:
+                    self._call_all(self._on_new_games_listeners, list(new_games))
+            except Exception as e:
+                logger.error('', exc_info=e)
 
             # Sleep
             logger.info(f'Sleeping for {self._sleep_delay_seconds} seconds...')
