@@ -80,6 +80,13 @@ class TwitchDropsWatchdog:
 
             try:
 
+                # Remove expired campaigns from database
+                for document_snapshot in self._firestore_client.collection('campaign_details').stream():
+                    d = document_snapshot.to_dict()
+                    end_date = get_datetime(d['endAt'])
+                    if end_date < datetime.datetime.now(datetime.timezone.utc):
+                        document_snapshot.reference.delete()
+
                 # Get all drop campaigns
                 logger.info('Updating campaign list...')
                 campaigns = twitch.get_drop_campaigns(self._twitch_credentials)
