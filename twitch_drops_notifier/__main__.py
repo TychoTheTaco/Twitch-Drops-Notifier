@@ -7,7 +7,6 @@ from google.cloud import firestore
 
 from .twitch_drops_watchdog import TwitchDropsWatchdog
 from .email import EmailSender
-from .utils import get_gmail_credentials
 
 
 def logging_filter(record):

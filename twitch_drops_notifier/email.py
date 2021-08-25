@@ -53,6 +53,8 @@ class EmailSender:
         watchdog.add_on_new_games_listener(self._on_new_games)
         watchdog.add_on_new_campaign_details_listener(self._on_new_campaign_details)
 
+        self._refresh_count = 0
+
     def _get_active_subscribed_games(self, user):
         subscribed_games = []
         for campaign_document in self._firestore_client.collection('campaign_details').list_documents():
@@ -130,10 +132,13 @@ class EmailSender:
         message['subject'] = subject
         message = {'raw': base64.urlsafe_b64encode(message.as_string().encode('utf-8')).decode('utf-8')}
 
+        logger.info(f'VALID: {self._creds.valid} EXPIRED: {self._creds.expired} EXPIRES: {self._creds.expiry} COUNT: {self._refresh_count}')
+
         if not self._creds.valid:
             if self._creds.expired and self._creds.refresh_token:
                 self._creds.refresh(Request())
                 logger.info('GMAIL TOKEN REFRESHED')
+                self._refresh_count += 1
             else:
                 logger.error('GMAIL TOKEN COULD NOT BE REFRESHED')
                 exit(1)
