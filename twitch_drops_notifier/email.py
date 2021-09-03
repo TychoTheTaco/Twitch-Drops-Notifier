@@ -36,10 +36,6 @@ class EmailSender:
     def __init__(self, credentials, firestore_client: firestore.Client, watchdog: TwitchDropsWatchdog):
         self._credentials = credentials
 
-        self._server = smtplib.SMTP('smtp.gmail.com', 587)
-        self._server.starttls()
-        self._server.login(self._credentials['user'], self._credentials['password'])
-
         self._firestore_client = firestore_client
 
         self._start_time = datetime.datetime.utcnow().replace(tzinfo=datetime.timezone.utc)
@@ -131,7 +127,12 @@ class EmailSender:
         message['to'] = to
         message['from'] = 'twitchdropsbot@gmail.com'
         message['subject'] = subject
-        self._server.send_message(message)
+
+        server = smtplib.SMTP('smtp.gmail.com', 587)
+        server.starttls()
+        server.login(self._credentials['user'], self._credentials['password'])
+        server.send_message(message)
+        server.quit()
 
     def _send_new_campaigns_email(self, user, campaigns):
         logger.info('Sending new campaigns email to: ' + user['email'])
