@@ -2,16 +2,14 @@ import base64
 import datetime
 import logging
 from email.mime.text import MIMEText
+import smtplib
 
 import pytz
-from googleapiclient.discovery import build
 from google.cloud import firestore
 from jinja2 import Environment, FileSystemLoader
 from jinja2.filters import FILTERS
-from google.auth.transport.requests import Request
 
 from .twitch_drops_watchdog import TwitchDropsWatchdog
-from . import utils
 
 
 # Set up logging
@@ -35,9 +33,12 @@ FILTERS['convert_time'] = convert_time
 
 class EmailSender:
 
-    def __init__(self, gmail_credentials, firestore_client: firestore.Client, watchdog: TwitchDropsWatchdog):
-        self._gmail_credentials = gmail_credentials
-        self._creds = utils.get_gmail_credentials(gmail_credentials, 'token.json')
+    def __init__(self, credentials, firestore_client: firestore.Client, watchdog: TwitchDropsWatchdog):
+        self._credentials = credentials
+
+        self._server = smtplib.SMTP('smtp.gmail.com', 587)
+        self._server.starttls()
+        self._server.login(self._credentials['user'], self._credentials['password'])
 
         self._firestore_client = firestore_client
 
@@ -130,21 +131,7 @@ class EmailSender:
         message['to'] = to
         message['from'] = 'twitchdropsbot@gmail.com'
         message['subject'] = subject
-        message = {'raw': base64.urlsafe_b64encode(message.as_string().encode('utf-8')).decode('utf-8')}
-
-        logger.info(f'VALID: {self._creds.valid} EXPIRED: {self._creds.expired} EXPIRES: {self._creds.expiry} COUNT: {self._refresh_count}')
-
-        if not self._creds.valid:
-            if self._creds.expired and self._creds.refresh_token:
-                self._creds.refresh(Request())
-                logger.info('GMAIL TOKEN REFRESHED')
-                self._refresh_count += 1
-            else:
-                logger.error('GMAIL TOKEN COULD NOT BE REFRESHED')
-                exit(1)
-
-        service = build('gmail', 'v1', credentials=self._creds)
-        service.users().messages().send(userId='me', body=message).execute()
+        self._server.send_message(message)
 
     def _send_new_campaigns_email(self, user, campaigns):
         logger.info('Sending new campaigns email to: ' + user['email'])

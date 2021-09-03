@@ -39,10 +39,10 @@ if __name__ == '__main__':
                         help='The path to the credentials to use when interacting with the Twitch API.',
                         dest='twitch_credentials',
                         default='twitch.json')
-    parser.add_argument('--gmail-credentials',
-                        help='The path to the credentials for the Gmail account used to send email notifications.',
-                        dest='gmail_credentials',
-                        default='gmail.json')
+    parser.add_argument('--email-credentials',
+                        help='The path to the credentials for the email account used to send email notifications.',
+                        dest='email_credentials',
+                        default='email.json')
     parser.add_argument('--google-credentials',
                         help='The path to the credentials for Google',
                         dest='google_credentials',
@@ -63,8 +63,11 @@ if __name__ == '__main__':
     # Create watchdog
     watchdog = TwitchDropsWatchdog(twitch_credentials, firestore_client, sleep_delay_seconds=args.sleep_delay)
 
+    with open(args.email_credentials) as file:
+        email_credentials = json.load(file)
+
     # Create email sender
-    email_sender = EmailSender(args.gmail_credentials, firestore_client, watchdog)
+    email_sender = EmailSender(email_credentials, firestore_client, watchdog)
 
     # Start watchdog
     watchdog.start()
