@@ -103,7 +103,11 @@ class TwitchDropsWatchdog:
                         continue
 
                     # Get campaign details
-                    campaign_details = twitch.get_drop_campaign_details(self._twitch_credentials, [campaign['id']])[0]
+                    try:
+                        campaign_details = twitch.get_drop_campaign_details(self._twitch_credentials, [campaign['id']])[0]
+                    except Exception as e:
+                        logger.error('Error getting drop campaign details!', exc_info=e)
+                        continue
 
                     # Update database
                     if self._add_or_update_campaign_details(campaign_details):
