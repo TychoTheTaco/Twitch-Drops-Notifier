@@ -1,5 +1,6 @@
 import requests
 import json
+import time
 
 
 def get_drop_campaigns(credentials: {str, str}):
@@ -20,7 +21,14 @@ def get_drop_campaigns(credentials: {str, str}):
             }
         }])
     )
-    return response.json()[0]['data']['currentUser']['dropCampaigns']
+    try:
+        c = response.json()[0]['data']['currentUser']['dropCampaigns']
+        return c
+    except Exception as e:
+        print(e)
+        with open('dc-' + str(int(time.time())) + '.json', 'w') as file:
+            file.write(response.json())
+        return None
 
 
 def get_drop_campaign_details(credentials: {str, str}, drop_ids):
@@ -50,4 +58,10 @@ def get_drop_campaign_details(credentials: {str, str}, drop_ids):
         },
         data=json.dumps(data)
     )
-    return [x['data']['user']['dropCampaign'] for x in response.json()]
+    try:
+        return [x['data']['user']['dropCampaign'] for x in response.json()]
+    except Exception as e:
+        print(e)
+        with open('dcd-' + str(int(time.time())) + '.json', 'w') as file:
+            file.write(response.json())
+        return None
