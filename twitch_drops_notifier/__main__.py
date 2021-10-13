@@ -50,7 +50,7 @@ if __name__ == '__main__':
     parser.add_argument('--sleep-delay',
                         help='The number of seconds to wait in between requests for new drop campaigns.',
                         dest='sleep_delay',
-                        default=60 * 60 * 1,
+                        default=60 * 30,
                         type=int)
     args = parser.parse_args()
 
