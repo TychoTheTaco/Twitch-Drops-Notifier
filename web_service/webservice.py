@@ -5,9 +5,8 @@ import argparse
 
 from google.cloud import firestore
 
-from twitch_drops_notifier.twitch import Client
-from .twitch_drops_watchdog import TwitchDropsWatchdog
-from .emails import EmailSender
+from twitch_drops_watchdog import TwitchDropsWatchdog
+from twitch_drops_watchdog.notifiers.email_notifier import EmailNotifier, FirestoreEmailRecipientLoader
 
 
 def logging_filter(record):
@@ -33,7 +32,7 @@ def get_datetime(timestamp):
     return datetime.datetime.strptime(timestamp, "%Y-%m-%dT%H:%M:%S%z")
 
 
-if __name__ == '__main__':
+def main():
     # Parse arguments
     parser = argparse.ArgumentParser()
     parser.add_argument('--twitch-credentials',
@@ -44,14 +43,10 @@ if __name__ == '__main__':
                         help='The path to the credentials for the email account used to send email notifications.',
                         dest='email_credentials',
                         default='email.json')
-    parser.add_argument('--google-credentials',
-                        help='The path to the credentials for Google',
-                        dest='google_credentials',
-                        default='google.json')
-    parser.add_argument('--sleep-delay',
-                        help='The number of seconds to wait in between requests for new drop campaigns.',
-                        dest='sleep_delay',
-                        default=60 * 30,
+    parser.add_argument('--polling-interval',
+                        help='The number of minutes to wait in between requests for new drop campaigns.',
+                        dest='polling_interval',
+                        default=15,
                         type=int)
     args = parser.parse_args()
 
@@ -67,13 +62,20 @@ if __name__ == '__main__':
     firestore_client = firestore.Client()
 
     # Create watchdog
-    watchdog = TwitchDropsWatchdog(twitch_client, firestore_client, sleep_delay_seconds=args.sleep_delay)
+    watchdog = TwitchDropsWatchdog(twitch_credentials, polling_interval_minutes=args.polling_interval)
 
+    # Create Firestore client
+    firestore_client = firestore.Client()
+
+    # Create email notifier
+    email_recipient_loader = FirestoreEmailRecipientLoader(firestore_client)
     with open(args.email_credentials) as file:
         email_credentials = json.load(file)
-
-    # Create email sender
-    email_sender = EmailSender(email_credentials, firestore_client, watchdog)
+    email_sender = EmailNotifier(email_credentials, email_recipient_loader)
 
     # Start watchdog
     watchdog.start()
+
+
+if __name__ == '__main__':
+    main()

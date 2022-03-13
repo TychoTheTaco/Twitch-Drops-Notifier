@@ -1,0 +1,35 @@
+<div>
+    {% for campaign in campaigns %}
+        <div>
+            <div style="display: inline-block; background-color: #504058; padding: 8px; color: whitesmoke; border-radius: 8px;">
+                <span style="font-size: 12pt;">
+                    <b>{{ campaign.game.displayName }}</b> | {{ campaign.name }}
+                </span>
+                <br>
+                <span style="font-family: 'Consolas', monospace">
+                    Starts: {{ campaign.startAt | convert_time(user) }}
+                    <br>
+                    Ends&nbsp;&nbsp;: {{ campaign.endAt | convert_time(user) }}
+                </span>
+                <br><br>
+                <table style="display: inline-table;">
+                    <tbody>
+                        <tr>
+                            {% for timeBasedDrop in campaign.timeBasedDrops %}
+                                <td style="padding-left: 8px; padding-right: 8px; width: 160px;">
+                                    <img src="{{ timeBasedDrop.benefitEdges[0].benefit.imageAssetURL }}" alt="Reward" width="80px" height="80px" style="display: block; margin-left: auto; margin-right: auto;"/>
+                                    <p>{{ timeBasedDrop.benefitEdges[0].benefit.name }}</p>
+                                </td>
+                            {% endfor %}
+                        </tr>
+                    </tbody>
+                </table>
+                <br>
+                <a style="color: whitesmoke;" href="https://www.twitch.tv/directory/game/{{ campaign.game.displayName | urlencode }}?tl=c2542d6d-cd10-4532-919b-3d19f30a768b">Watch now!</a>
+            </div>
+        </div>
+        {% if not loop.last %}
+            <br>
+        {% endif %}
+    {% endfor %}
+</div>

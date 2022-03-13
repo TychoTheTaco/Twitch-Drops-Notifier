@@ -9,3 +9,6 @@ database.json
 
 # Credentials
 gmail.pickle
+
+# Config
+config.json
