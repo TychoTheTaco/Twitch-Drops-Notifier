@@ -54,7 +54,7 @@ class EmailSender:
 
     def _get_active_subscribed_games(self, user):
         subscribed_games = []
-        for campaign_document in self._firestore_client.collection('campaign_details').list_documents():
+        for campaign_document in self._firestore_client.collection('campaigns').list_documents():
             campaign = campaign_document.get().to_dict()
 
             # Ignore campaigns that have already ended

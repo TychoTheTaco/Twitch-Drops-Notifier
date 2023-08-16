@@ -5,8 +5,9 @@ import argparse
 
 from google.cloud import firestore
 
+from twitch_drops_notifier.twitch import Client
 from .twitch_drops_watchdog import TwitchDropsWatchdog
-from .email import EmailSender
+from .emails import EmailSender
 
 
 def logging_filter(record):
@@ -58,10 +59,15 @@ if __name__ == '__main__':
     with open(args.twitch_credentials, 'r') as file:
         twitch_credentials = json.load(file)
 
+    # Create Twitch client
+    oauth_token = twitch_credentials['oauth_token']
+    user_id = twitch_credentials['user_id']
+    twitch_client = Client(client_id=Client.CLIENT_ID_TV, oath_token=oauth_token, user_id=user_id)
+
     firestore_client = firestore.Client()
 
     # Create watchdog
-    watchdog = TwitchDropsWatchdog(twitch_credentials, firestore_client, sleep_delay_seconds=args.sleep_delay)
+    watchdog = TwitchDropsWatchdog(twitch_client, firestore_client, sleep_delay_seconds=args.sleep_delay)
 
     with open(args.email_credentials) as file:
         email_credentials = json.load(file)

@@ -17,26 +17,19 @@ def get_datetime(timestamp):
 
 class TwitchDropsWatchdog:
     """
-    This class is used to poll the Twitch API at regular intervals to check for
-    new "Drop Campaigns".
+    This class is used to poll the Twitch API at regular intervals to check for new Drop Campaigns.
     """
 
-    def __init__(self, twitch_credentials, firestore_client: firestore.Client, sleep_delay_seconds: int = 60 * 60 * 1):
+    def __init__(self, twitch_client: twitch.Client, firestore_client: firestore.Client, sleep_delay_seconds: int = 60 * 60 * 1):
         """
         Creates a new TwitchDropsWatchdog.
-        :param twitch_credentials: A dictionary containing the required
-        credentials to use the Twitch API. The following are required:
-        {
-          "client_id": str,
-          "oauth_token": str,
-          "channel_login": str
-        }
+        :param twitch_client:
         :param firestore_client:
         :param sleep_delay_seconds: The number of seconds to wait in between
         polling the Twitch API. Since new campaigns are not added very often,
         this can be set to a few hours.
         """
-        self._twitch_credentials = twitch_credentials
+        self._twitch_client = twitch_client
         self._firestore_client = firestore_client
         self._sleep_delay_seconds = sleep_delay_seconds
 
@@ -44,7 +37,7 @@ class TwitchDropsWatchdog:
         self._on_new_games_listeners = []
 
     def _add_or_update_campaign_details(self, campaign):
-        return self._add_or_update_document(self._firestore_client.collection('campaign_details').document(campaign['id']), campaign)
+        return self._add_or_update_document(self._firestore_client.collection('campaigns').document(campaign['id']), campaign)
 
     def _add_or_update_game(self, game):
         return self._add_or_update_document(self._firestore_client.collection('games').document(game['id']), game)
@@ -81,7 +74,7 @@ class TwitchDropsWatchdog:
             try:
 
                 # Remove expired campaigns from database
-                for document_snapshot in self._firestore_client.collection('campaign_details').stream():
+                for document_snapshot in self._firestore_client.collection('campaigns').stream():
                     d = document_snapshot.to_dict()
                     end_date = get_datetime(d['endAt'])
                     if end_date < datetime.datetime.now(datetime.timezone.utc):
@@ -89,7 +82,7 @@ class TwitchDropsWatchdog:
 
                 # Get all drop campaigns
                 logger.info('Updating campaign list...')
-                campaigns = twitch.get_drop_campaigns(self._twitch_credentials)
+                campaigns = self._twitch_client.get_drop_campaigns()
                 logger.info(f'Found {len(campaigns)} campaigns.')
 
                 # Update drop campaign database and find new campaigns
@@ -104,10 +97,10 @@ class TwitchDropsWatchdog:
 
                     # Get campaign details
                     try:
-                        campaign_details = twitch.get_drop_campaign_details(self._twitch_credentials, [campaign['id']])[0]
+                        campaign_details = self._twitch_client.get_drop_campaign_details([campaign['id']])[0]
                     except Exception as e:
                         logger.error('Error getting drop campaign details!', exc_info=e)
-                        continue
+                        campaign_details = campaign
 
                     # Update database
                     if self._add_or_update_campaign_details(campaign_details):
