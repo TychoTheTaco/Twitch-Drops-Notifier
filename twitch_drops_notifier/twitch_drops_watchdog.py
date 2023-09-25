@@ -95,17 +95,17 @@ class TwitchDropsWatchdog:
                     if datetime.datetime.now(datetime.timezone.utc) >= get_datetime(campaign['endAt']):
                         continue
 
-                    # Get campaign details
-                    try:
-                        campaign_details = self._twitch_client.get_drop_campaign_details([campaign['id']])[0]
-                    except Exception as e:
-                        logger.error('Error getting drop campaign details!', exc_info=e)
-                        campaign_details = campaign
+                    # Get campaign details TODO: Requires integrity check
+                    # try:
+                    #     campaign_details = self._twitch_client.get_drop_campaign_details([campaign['id']])[0]
+                    # except Exception as e:
+                    #     logger.error('Error getting drop campaign details!', exc_info=e)
+                    #     campaign_details = campaign
 
                     # Update database
-                    if self._add_or_update_campaign_details(campaign_details):
-                        new_campaign_details.append(campaign_details)
-                        logger.info('New campaign details: ' + campaign['game']['displayName'] + ' ' + campaign['name'])
+                    if self._add_or_update_campaign_details(campaign):
+                        new_campaign_details.append(campaign)
+                        logger.info('New campaign: ' + campaign['game']['displayName'] + ' ' + campaign['name'])
                     game = campaign['game']
                     if self._add_or_update_game(game):
                         new_games.append(game)

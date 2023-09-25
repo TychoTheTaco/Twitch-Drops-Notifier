@@ -1,5 +1,5 @@
 requests==2.31.0
-google-api-python-client==2.97.0
-google-cloud-firestore==2.11.1
-pytz
+google-api-python-client==2.100.0
+google-cloud-firestore==2.12.0
+pytz==2023.3.post1
 jinja2
