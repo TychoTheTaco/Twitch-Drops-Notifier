@@ -6,7 +6,7 @@ import argparse
 from google.cloud import firestore
 
 from twitch_drops_watchdog import TwitchDropsWatchdog
-from twitch_drops_watchdog.notifiers.email_notifier import EmailNotifier, FirestoreEmailRecipientLoader
+from twitch_drops_watchdog.notifiers.email import EmailNotifier, FirestoreEmailRecipientLoader
 
 
 def logging_filter(record):

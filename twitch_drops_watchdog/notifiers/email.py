@@ -10,8 +10,8 @@ import pytz
 from jinja2 import Environment, FileSystemLoader
 from jinja2.filters import FILTERS
 
-from .notifier import Notifier, Recipient, RecipientLoader
-
+from .notifier import Notifier, Recipient, RecipientLoader, EventMapType, BufferedNotifier, Subscriber
+from ..twitch import Game, DropCampaign
 
 # Set up logging
 logger = logging.getLogger(__name__)
@@ -57,7 +57,7 @@ class EmailRecipientLoader(RecipientLoader):
 
 class JSONEmailRecipientLoader(EmailRecipientLoader):
     """
-    Load email recipient data from a JSON file.
+    Load email recipients from a JSON file.
     """
 
     def __init__(self, json_data):
@@ -74,51 +74,56 @@ class JSONEmailRecipientLoader(EmailRecipientLoader):
             yield recipient
 
 
-class EmailNotifier(Notifier):
+class EmailSubscriber(Subscriber):
 
-    def __init__(self, credentials, recipient_loader: EmailRecipientLoader):
-        self._credentials = credentials
-        self._recipient_loader = recipient_loader
+    def __init__(self, events: EventMapType, email_address: str, timezone: str = 'utc'):
+        super().__init__(events)
+        self._email_address = email_address
+        self._timezone = timezone
 
+    @property
+    def email_address(self):
+        return self._email_address
+
+    @property
+    def timezone(self):
+        return self._timezone
+
+
+class EmailNotifier(BufferedNotifier):
+
+    def __init__(self, user: str, password: str):
+        super().__init__()
+        self._user = user
+        self._password = password
         self._jinja_environment = Environment(loader=FileSystemLoader(Path(__file__, '..', '..', 'email_templates').resolve()))
 
-    def on_new_drop_campaigns(self, campaigns):
-        for recipient in self._recipient_loader:
+    def notify_on_new_drop_campaigns(self, subscriber: EmailSubscriber, campaigns: [DropCampaign]):
+        # Send new campaigns email
+        try:
+            self._send_new_campaigns_email(subscriber, campaigns)
+        except Exception as e:
+            logger.error('Failed to send email!', exc_info=e)
 
-            # Get campaigns that the user is subscribed to
-            subscribed_campaigns = []
-            for campaign in campaigns:
-                if len(recipient.game_ids) == 0 or campaign['game']['id'] in recipient.game_ids:
-                    subscribed_campaigns.append(campaign)
-
-            # Send new campaigns email
-            if len(subscribed_campaigns) > 0:
-                try:
-                    self._send_new_campaigns_email(recipient, subscribed_campaigns)
-                except Exception as e:
-                    logger.error('Failed to send email: ' + str(e))
-
-    def on_new_games(self, games):
-        for recipient in self._recipient_loader:
-            if recipient.new_game_notifications:
-                try:
-                    self._send_new_games_email(recipient, games)
-                except Exception as e:
-                    logger.error('Failed to send email: ' + str(e))
+    def notify_on_new_games(self, subscriber: EmailSubscriber, games: [Game]):
+        try:
+            self._send_new_games_email(subscriber, games)
+        except Exception as e:
+            logger.error('Failed to send email: ' + str(e))
 
     def _send(self, to, subject, body):
         message = MIMEText(body, 'html')
         message['to'] = to
-        message['from'] = 'twitchdropsbot@gmail.com'
+        message['from'] = self._user
         message['subject'] = subject
 
         server = smtplib.SMTP('smtp.gmail.com', 587)
         server.starttls()
-        server.login(self._credentials['user'], self._credentials['password'])
+        server.login(self._user, self._password)
         server.send_message(message)
         server.quit()
 
-    def _send_new_campaigns_email(self, recipient: EmailRecipient, campaigns):
+    def _send_new_campaigns_email(self, recipient: EmailSubscriber, campaigns):
         logger.info('Sending new campaigns email to: ' + recipient.email_address)
         body = self._jinja_environment.get_template('new_campaigns.html').render(
             user={
@@ -128,7 +133,7 @@ class EmailNotifier(Notifier):
         )
         self._send(recipient.email_address, 'New Twitch Drop Campaigns!', body)
 
-    def _send_new_games_email(self, recipient: EmailRecipient, games):
+    def _send_new_games_email(self, recipient: EmailSubscriber, games):
         logger.info('Sending new games email to: ' + recipient.email_address)
         body = self._jinja_environment.get_template('new_games.html').render(
             games=games
