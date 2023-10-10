@@ -1,4 +1,5 @@
-from abc import abstractmethod
+import time
+from abc import abstractmethod, ABC
 import datetime
 import logging
 from email.mime.text import MIMEText
@@ -10,7 +11,7 @@ import pytz
 from jinja2 import Environment, FileSystemLoader
 from jinja2.filters import FILTERS
 
-from .notifier import Notifier, Recipient, RecipientLoader, EventMapType, BufferedNotifier, Subscriber
+from .notifier import EventMapType, BufferedNotifier, Subscriber, SubscriberIterator
 from ..twitch import Game, DropCampaign
 
 # Set up logging
@@ -32,48 +33,6 @@ def convert_time(value, user):
 FILTERS['convert_time'] = convert_time
 
 
-class EmailRecipient(Recipient):
-
-    def __init__(self, email_address: str, game_ids: Optional[List[str]] = None, new_game_notifications: bool = True, timezone: str = 'utc'):
-        super().__init__(game_ids, new_game_notifications)
-        self._email_address = email_address
-        self._timezone = timezone
-
-    @property
-    def email_address(self):
-        return self._email_address
-
-    @property
-    def timezone(self):
-        return self._timezone
-
-
-class EmailRecipientLoader(RecipientLoader):
-
-    @abstractmethod
-    def __iter__(self) -> Iterator[EmailRecipient]:
-        raise NotImplementedError
-
-
-class JSONEmailRecipientLoader(EmailRecipientLoader):
-    """
-    Load email recipients from a JSON file.
-    """
-
-    def __init__(self, json_data):
-        self._recipients = []
-        for item in json_data:
-            self._recipients.append(EmailRecipient(
-                item['email'],
-                item['games'],
-                item['new_game_notifications']
-            ))
-
-    def __iter__(self) -> Iterator[EmailRecipient]:
-        for recipient in self._recipients:
-            yield recipient
-
-
 class EmailSubscriber(Subscriber):
 
     def __init__(self, events: EventMapType, email_address: str, timezone: str = 'utc'):
@@ -90,13 +49,21 @@ class EmailSubscriber(Subscriber):
         return self._timezone
 
 
+class EmailSubscriberIterator(SubscriberIterator):
+
+    @abstractmethod
+    def __iter__(self) -> Iterator[EmailSubscriber]:
+        raise NotImplementedError
+
+
 class EmailNotifier(BufferedNotifier):
 
-    def __init__(self, user: str, password: str):
+    def __init__(self, user: str, password: str, email_template_dir: str | Path):
         super().__init__()
         self._user = user
         self._password = password
-        self._jinja_environment = Environment(loader=FileSystemLoader(Path(__file__, '..', '..', 'email_templates').resolve()))
+        self._jinja_environment = Environment(loader=FileSystemLoader(Path(email_template_dir).resolve()))
+        self._smtp_server = None
 
     def notify_on_new_drop_campaigns(self, subscriber: EmailSubscriber, campaigns: [DropCampaign]):
         # Send new campaigns email
@@ -109,33 +76,45 @@ class EmailNotifier(BufferedNotifier):
         try:
             self._send_new_games_email(subscriber, games)
         except Exception as e:
-            logger.error('Failed to send email: ' + str(e))
+            logger.error('Failed to send email', exc_info=e)
 
-    def _send(self, to, subject, body):
+    def send(self, to, subject, body):
         message = MIMEText(body, 'html')
         message['to'] = to
         message['from'] = self._user
         message['subject'] = subject
 
-        server = smtplib.SMTP('smtp.gmail.com', 587)
-        server.starttls()
-        server.login(self._user, self._password)
-        server.send_message(message)
-        server.quit()
+        def create_smtp_server() -> smtplib.SMTP:
+            server = smtplib.SMTP('smtp.gmail.com', 587)
+            server.starttls()
+            server.login(self._user, self._password)
+            return server
+
+        if self._smtp_server is None:
+            self._smtp_server = create_smtp_server()
+
+        try:
+            self._smtp_server.send_message(message)
+        except smtplib.SMTPServerDisconnected:
+            logger.info('SMTP Server disconnected. Logging in again...')
+            self._smtp_server = create_smtp_server()
+            self._smtp_server.send_message(message)
+
+        time.sleep(1.5)
 
     def _send_new_campaigns_email(self, recipient: EmailSubscriber, campaigns):
         logger.info('Sending new campaigns email to: ' + recipient.email_address)
         body = self._jinja_environment.get_template('new_campaigns.html').render(
             user={
-              'timezone': recipient.timezone
+                'timezone': recipient.timezone
             },
             campaigns=campaigns
         )
-        self._send(recipient.email_address, 'New Twitch Drop Campaigns!', body)
+        self.send(recipient.email_address, 'New Twitch Drop Campaigns!', body)
 
     def _send_new_games_email(self, recipient: EmailSubscriber, games):
         logger.info('Sending new games email to: ' + recipient.email_address)
         body = self._jinja_environment.get_template('new_games.html').render(
             games=games
         )
-        self._send(recipient.email_address, 'New Games', body)
+        self.send(recipient.email_address, 'New Games', body)

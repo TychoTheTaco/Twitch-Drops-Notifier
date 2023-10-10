@@ -1,7 +1,9 @@
+import abc
 import datetime
 import json
 import logging
 import time
+from abc import ABC
 from pathlib import Path
 from typing import Set
 
@@ -23,7 +25,34 @@ def _call_all(callables, parameters):
             logger.exception('Exception occurred while calling listener!', exc_info=e)
 
 
-class Database:
+class Database(ABC):
+
+    @abc.abstractmethod
+    def load(self):
+        raise NotImplementedError
+
+    @abc.abstractmethod
+    def save(self):
+        raise NotImplementedError
+
+    @abc.abstractmethod
+    def add_campaign(self, campaign: DropCampaign) -> bool:
+        raise NotImplementedError
+
+    @abc.abstractmethod
+    def remove_campaign(self, campaign_id: str):
+        raise NotImplementedError
+
+    @abc.abstractmethod
+    def add_game(self, game: Game) -> bool:
+        raise NotImplementedError
+
+    @abc.abstractmethod
+    def get_campaigns(self):
+        raise NotImplementedError
+
+
+class JsonDatabase(Database):
 
     def __init__(self, path: str | Path):
         self._path = path
@@ -68,11 +97,11 @@ class TwitchDropsWatchdog:
     This class is used to poll the Twitch API at regular intervals to check for new Drops campaigns.
     """
 
-    def __init__(self, twitch_api_client: Client, polling_interval_minutes: int = 15):
+    def __init__(self, twitch_api_client: Client, polling_interval_minutes: int = 15, database: Database = JsonDatabase('database.json')):
         self._twitch_api_client = twitch_api_client
         self._polling_interval_minutes = polling_interval_minutes
 
-        self._database = Database('database.json')
+        self._database = database
         self._database.load()
 
         self._on_new_campaigns_listeners = []

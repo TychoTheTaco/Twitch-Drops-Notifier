@@ -1,13 +1,14 @@
+import argparse
 import json
 import logging
-import argparse
-from typing import Any, Dict, TypeVar, Union, List, TypedDict
+from pathlib import Path
+from typing import Any, Dict, List
 
 from twitch_drops_watchdog.notifiers.discord import DiscordNotifier, DiscordSubscriber
+from .notifiers.email import EmailNotifier, EmailSubscriber
+from .notifiers.notifier import Notifier, BufferedNotifier, EventMapType
 from .twitch import Client
 from .twitch_drops_watchdog import TwitchDropsWatchdog
-from .notifiers.notifier import Notifier, BufferedNotifier, EventMapType, NewDropCampaignEventOptions, Subscriber
-from .notifiers.email import EmailNotifier, JSONEmailRecipientLoader, EmailSubscriber
 
 
 def logging_filter(record):
@@ -77,7 +78,7 @@ class ConfigurationParser:
             user = credentials_json.get('user')
             password = credentials_json.get('password')
 
-            email_notifier = EmailNotifier(user, password)
+            email_notifier = EmailNotifier(user, password, Path(__file__, '..', 'email_templates'))
 
             subscribers = self.parse_email_subscribers()
             for sub in subscribers:

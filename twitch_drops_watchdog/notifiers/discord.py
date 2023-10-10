@@ -1,18 +1,13 @@
-import time
-from abc import abstractmethod
 import datetime
 import logging
-from email.mime.text import MIMEText
-import smtplib
-from pathlib import Path
-from typing import Optional, List, Iterator, Any
+import time
+from typing import Any
 
 import pytz
 import requests
-from jinja2 import Environment, FileSystemLoader
 from jinja2.filters import FILTERS
 
-from .notifier import Notifier, Recipient, RecipientLoader, EventMapType, Subscriber
+from .notifier import Notifier, EventMapType, Subscriber
 from ..twitch import Game, DropCampaign
 
 # Set up logging

@@ -1,9 +1,11 @@
 import datetime
 import uuid
+from typing import Optional, Dict, Any
 
 from flask import Flask, render_template, request
 from google.cloud import firestore
 import pytz
+from google.cloud.firestore_v1 import FieldFilter, DocumentSnapshot
 
 
 def get_datetime(timestamp):
@@ -13,25 +15,40 @@ def get_datetime(timestamp):
 app = Flask(__name__)
 
 firestore_client = firestore.Client()
+firestore_client.collection('games').on_snapshot(lambda documents, changes, read_time: update_games_cache())
+
+games_cache = []
+
+
+def update_games_cache():
+    print('Updating games cache...')
+    games_cache.clear()
+    for document in firestore_client.collection('games').stream():
+        d = document.to_dict()
+        games_cache.append(d)
+
+
+def get_user_document(user_id: str) -> Optional[DocumentSnapshot]:
+    for document in firestore_client.collection('users').where(filter=FieldFilter('id', '==', user_id)).stream():
+        return document
+    return None
+
+
+def get_user(user_id: str) -> Optional[Dict[str, Any]]:
+    document = get_user_document(user_id)
+    if document:
+        return document.to_dict()
+    return None
 
 
 @app.route('/')
 def index():
     # Find user
-    user = None
     user_id = request.args.get('id', None)
-    if user_id is not None:
-        for document in firestore_client.collection('users').list_documents():
-            d = document.get().to_dict()
-            if d['id'] == user_id:
-                user = d
-                break
+    user = get_user(user_id)
 
     # Games
-    games = []
-    for game_document in firestore_client.collection('games').list_documents():
-        games.append(game_document.get().to_dict())
-    games = list(sorted(games, key=lambda x: x['displayName']))
+    games = list(sorted(games_cache, key=lambda x: x['displayName']))
 
     # Timezones
     timezones = pytz.common_timezones
@@ -73,12 +90,8 @@ def subscribe():
 def update():
 
     # Find user
-    for document in firestore_client.collection('users').list_documents():
-        d = document.get().to_dict()
-        if d['id'] == request.args.get('id'):
-            user = d
-            break
-    else:
+    user = get_user(request.args.get('id'))
+    if not user:
         return render_template('error.html', message='This user is not subscribed.')
 
     # Update games
@@ -102,16 +115,15 @@ def update():
 
 @app.route('/unsubscribe', methods=['GET'])
 def unsubscribe():
-    for document in firestore_client.collection('users').list_documents():
-        d = document.get().to_dict()
-        if d['id'] == request.args.get('id'):
-            document.delete()
-            break
-    else:
+    user_document = get_user_document(request.args.get('id'))
+    if not user_document:
         return render_template('error.html', message='This user is not subscribed.')
+
+    user_document.reference.delete()
 
     return render_template('success.html', message='You have been unsubscribed')
 
 
 if __name__ == '__main__':
+    update_games_cache()
     app.run('localhost')

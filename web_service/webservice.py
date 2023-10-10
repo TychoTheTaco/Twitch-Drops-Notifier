@@ -2,11 +2,16 @@ import datetime
 import json
 import logging
 import argparse
+from pathlib import Path
 
 from google.cloud import firestore
 
 from twitch_drops_watchdog import TwitchDropsWatchdog
-from twitch_drops_watchdog.notifiers.email import EmailNotifier, FirestoreEmailRecipientLoader
+from twitch_drops_watchdog.notifiers.email import EmailNotifier
+from notifiers.email import FirestoreEmailSubscriberIterator, WebServiceEmailNotifier
+from twitch_drops_watchdog.notifiers.notifier import BufferedNotifier
+from twitch_drops_watchdog.twitch import Client, Game, DropCampaign
+from twitch_drops_watchdog.twitch_drops_watchdog import Database
 
 
 def logging_filter(record):
@@ -30,6 +35,53 @@ logging.getLogger().handlers[0].addFilter(logging_filter)
 
 def get_datetime(timestamp):
     return datetime.datetime.strptime(timestamp, "%Y-%m-%dT%H:%M:%S%z")
+
+
+class FirestoreDatabase(Database):
+
+    def __init__(self, firestore_client: firestore.Client):
+        self._firestore_client = firestore_client
+
+    def load(self):
+        pass
+
+    def save(self):
+        pass
+
+    def add_campaign(self, campaign: DropCampaign) -> bool:
+        return self._add_or_update_document(self._firestore_client.collection('campaigns').document(campaign['id']), campaign)
+
+    def remove_campaign(self, campaign_id: str):
+        self._firestore_client.collection('campaigns').document(campaign_id).delete()
+
+    def add_game(self, game: Game) -> bool:
+        return self._add_or_update_document(self._firestore_client.collection('games').document(game['id']), game)
+
+    def get_campaigns(self):
+        campaign_dictionary = {}
+        for document_snapshot in self._firestore_client.collection('campaigns').stream():
+            d = document_snapshot.to_dict()
+            campaign_dictionary[d['id']] = d
+        return campaign_dictionary.items()
+
+    def _add_or_update_document(self, document_reference, data):
+        document_snapshot = document_reference.get()
+
+        # If this document already exists in our database, check if it changed
+        if document_snapshot.exists:
+            before = document_snapshot.to_dict()
+            document_reference.update(data)
+            after = document_reference.get().to_dict()
+            if before != after:
+                logger.debug('Document data changed!')
+            return False
+
+        # Add a 'created' field to the document so we know when it was added to the database
+        data['created'] = datetime.datetime.utcnow().replace(microsecond=0, tzinfo=datetime.timezone.utc).isoformat()
+
+        # Add document to database
+        document_reference.set(data)
+        return True
 
 
 def main():
@@ -59,19 +111,42 @@ def main():
     user_id = twitch_credentials['user_id']
     twitch_client = Client(client_id=Client.CLIENT_ID_TV, oath_token=oauth_token, user_id=user_id)
 
-    firestore_client = firestore.Client()
-
-    # Create watchdog
-    watchdog = TwitchDropsWatchdog(twitch_credentials, polling_interval_minutes=args.polling_interval)
-
     # Create Firestore client
     firestore_client = firestore.Client()
 
+    # Create watchdog
+    watchdog = TwitchDropsWatchdog(
+        twitch_client,
+        polling_interval_minutes=args.polling_interval,
+        database=FirestoreDatabase(firestore_client)
+    )
+
     # Create email notifier
-    email_recipient_loader = FirestoreEmailRecipientLoader(firestore_client)
     with open(args.email_credentials) as file:
         email_credentials = json.load(file)
-    email_sender = EmailNotifier(email_credentials, email_recipient_loader)
+    email_notifier = WebServiceEmailNotifier(
+        email_credentials['user'],
+        email_credentials['password'],
+        Path(__file__, '..', 'email_templates'),
+        firestore_client
+    )
+    email_notifier.subscribe(FirestoreEmailSubscriberIterator(firestore_client))
+
+    # Add notifiers
+    def on_new_games(games):
+        for item in games:
+            email_notifier.on_new_game(item)
+        if isinstance(email_notifier, BufferedNotifier):
+            email_notifier.send_all_events()
+
+    def on_new_campaigns(campaigns):
+        for item in campaigns:
+            email_notifier.on_new_drop_campaign(item)
+        if isinstance(email_notifier, BufferedNotifier):
+            email_notifier.send_all_events()
+
+    watchdog.add_on_new_games_listener(on_new_games)
+    watchdog.add_on_new_campaigns_listener(on_new_campaigns)
 
     # Start watchdog
     watchdog.start()

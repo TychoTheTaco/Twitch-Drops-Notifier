@@ -31,16 +31,34 @@ class Subscriber(ABC):
         return self._events
 
 
+class SubscriberIterator(ABC):
+
+    @abstractmethod
+    def __iter__(self) -> Iterator[Subscriber]:
+        raise NotImplementedError
+
+
 class Notifier(ABC):
 
     def __init__(self):
         self._subscribers: [Subscriber] = []
+        self._subscriber_iterators: [SubscriberIterator] = []
 
-    def subscribe(self, subscriber):
-        self._subscribers.append(subscriber)
+    def subscribe(self, subscriber: Subscriber | SubscriberIterator):
+        if isinstance(subscriber, Subscriber):
+            self._subscribers.append(subscriber)
+        else:
+            self._subscriber_iterators.append(subscriber)
+
+    def _iterate_all_subscribers(self):
+        for subscriber in self._subscribers:
+            yield subscriber
+        for subscriber_iterator in self._subscriber_iterators:
+            for subscriber in subscriber_iterator:
+                yield subscriber
 
     def on_new_drop_campaign(self, campaign: DropCampaign):
-        for subscriber in self._subscribers:
+        for subscriber in self._iterate_all_subscribers():
             options = subscriber.events().get('new_drop_campaign')
             if options is None:
                 continue
@@ -67,7 +85,7 @@ class Notifier(ABC):
         raise NotImplementedError
 
     def on_new_game(self, game: Game):
-        for subscriber in self._subscribers:
+        for subscriber in self._iterate_all_subscribers():
             options = subscriber.events().get('new_game')
             if options is None:
                 continue
@@ -115,36 +133,3 @@ class BufferedNotifier(Notifier):
             if len(games) > 0:
                 self.notify_on_new_games(subscriber, games)
         del self._event_buffers['new_game']
-
-
-class Recipient:
-    """
-    Represents the recipient of a notification.
-    """
-
-    def __init__(self, game_ids: Optional[List[str]] = None, new_game_notifications: bool = True):
-        """
-        :param game_ids: The game IDs that this recipient is subscribed to. If none, the recipient should be notified
-        for all games.
-        :param new_game_notifications: True if this recipient should get new game notifications
-        """
-        self._game_ids = game_ids
-        self._new_game_notifications = new_game_notifications
-
-    @property
-    def game_ids(self):
-        return self._game_ids
-
-    @property
-    def new_game_notifications(self):
-        return self._new_game_notifications
-
-
-class RecipientLoader(ABC):
-    """
-    A `RecipientLoader` loads recipient data from a source.
-    """
-
-    @abstractmethod
-    def __iter__(self) -> Iterator[Recipient]:
-        raise NotImplementedError

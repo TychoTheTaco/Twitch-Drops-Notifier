@@ -1,17 +1,14 @@
-from abc import ABC, abstractmethod
 import datetime
 import logging
-from email.mime.text import MIMEText
-import smtplib
-from typing import Optional, List, Iterator
+from pathlib import Path
+from typing import Iterator
 
 import pytz
 from google.cloud import firestore
-from jinja2 import Environment, FileSystemLoader
 from jinja2.filters import FILTERS
 
-from twitch_drops_watchdog.notifiers.notifier import Notifier, Recipient, RecipientLoader
-
+from twitch_drops_watchdog.notifiers.email import EmailSubscriberIterator, EmailSubscriber, EmailNotifier
+from twitch_drops_watchdog.notifiers.notifier import EventMapType
 
 # Set up logging
 logger = logging.getLogger(__name__)
@@ -32,35 +29,7 @@ def convert_time(value, user):
 FILTERS['convert_time'] = convert_time
 
 
-class EmailRecipient(Recipient):
-
-    def __init__(self, id_number: str, email_address: str, game_ids: Optional[List[str]] = None, new_game_notifications: bool = True, timezone: datetime.timezone = None):
-        super().__init__(game_ids, new_game_notifications)
-        self._id = id_number
-        self._email_address = email_address
-        self._timezone = timezone
-
-    @property
-    def id(self):
-        return self._id
-
-    @property
-    def email_address(self):
-        return self._email_address
-
-    @property
-    def timezone(self):
-        return self._timezone
-
-
-class EmailRecipientLoader(ABC, RecipientLoader):
-
-    @abstractmethod
-    def __iter__(self) -> Iterator[EmailRecipient]:
-        raise NotImplementedError
-
-
-class FirestoreEmailRecipientLoader(EmailRecipientLoader):
+class FirestoreEmailSubscriberIterator(EmailSubscriberIterator):
     """
     Load email recipient data from Firestore.
     """
@@ -68,70 +37,88 @@ class FirestoreEmailRecipientLoader(EmailRecipientLoader):
     def __init__(self, firestore_client: firestore.Client):
         self._firestore_client = firestore_client
 
-    def __iter__(self) -> Iterator[EmailRecipient]:
+    def __iter__(self) -> Iterator[EmailSubscriber]:
         for snapshot in self._firestore_client.collection('users').stream():
             user = snapshot.to_dict()
-            yield EmailRecipient(user['email'], user['games'], *user)
+            events: EventMapType = {
+                'new_drop_campaign': {
+                    'games': user['games']
+                }
+            }
+            if user['new_game_notifications']:
+                events['new_game'] = {}
+            yield EmailSubscriber(events, user['email'], timezone=user['timezone'])
 
 
-class EmailNotifier(Notifier):
+class WebServiceEmailNotifier(EmailNotifier):
 
-    def __init__(self, credentials, recipient_loader: EmailRecipientLoader):
-        self._credentials = credentials
-        self._recipient_loader = recipient_loader
+    def __init__(self, user: str, password: str, email_template_dir: str | Path, firestore_client: firestore.Client):
+        super().__init__(user, password, email_template_dir)
+        self._firestore_client = firestore_client
+        self._start_time = datetime.datetime.utcnow().replace(tzinfo=datetime.timezone.utc)
+        self._domain = 'https://twitch-drops-bot.uw.r.appspot.com'
 
-        self._jinja_environment = Environment(loader=FileSystemLoader('email_templates'))
+        # Listen for database changes
+        self._firestore_client.collection('users').on_snapshot(self._on_snapshot_users)
 
-    def on_new_drop_campaigns(self, campaigns):
-        for recipient in self._recipient_loader:
+    def _get_active_subscribed_games(self, user):
+        subscribed_games = []
+        for campaign_document in self._firestore_client.collection('campaigns').list_documents():
+            campaign = campaign_document.get().to_dict()
 
-            # Get campaigns that the user is subscribed to
-            subscribed_campaigns = []
-            for campaign in campaigns:
-                if len(recipient.game_ids) == 0 or campaign['game']['id'] in recipient.game_ids:
-                    subscribed_campaigns.append(campaign)
+            # Ignore campaigns that have already ended
+            if datetime.datetime.now(datetime.timezone.utc) >= get_datetime(campaign['endAt']):
+                continue
 
-            # Send new campaigns email
-            if len(subscribed_campaigns) > 0:
+            if campaign['game']['id'] in user['games']:
+                subscribed_games.append(campaign)
+        return subscribed_games
+
+    def _on_snapshot_users(self, documents, changes, read):
+        for change in changes:
+            user = change.document.to_dict()
+            if change.type.name == 'ADDED':
+
+                # Ignore documents that were added before this script was started
+                if datetime.datetime.fromisoformat(user['created']) < self._start_time:
+                    continue
+
+                logger.debug('User added: ' + user['email'])
+
+                # Send initial email
                 try:
-                    self._send_new_campaigns_email(recipient, subscribed_campaigns)
+                    self._send_initial_email(user, self._get_active_subscribed_games(user))
                 except Exception as e:
                     logger.error('Failed to send email: ' + str(e))
 
-    def on_new_games(self, games):
-        for recipient in self._recipient_loader:
-            if recipient.new_game_notifications:
+            elif change.type.name == 'MODIFIED':
+
+                logger.debug('User modified: ' + user['email'])
                 try:
-                    self._send_new_games_email(recipient, games)
+                    self._send_update_email(user, self._get_active_subscribed_games(user))
                 except Exception as e:
                     logger.error('Failed to send email: ' + str(e))
 
-    def _send(self, to, subject, body):
-        message = MIMEText(body, 'html')
-        message['to'] = to
-        message['from'] = 'twitchdropsbot@gmail.com'
-        message['subject'] = subject
+            elif change.type.name == 'REMOVED':
 
-        server = smtplib.SMTP('smtp.gmail.com', 587)
-        server.starttls()
-        server.login(self._credentials['user'], self._credentials['password'])
-        server.send_message(message)
-        server.quit()
+                logger.debug('User removed: ' + user['email'])
 
-    def _send_new_campaigns_email(self, recipient: EmailRecipient, campaigns):
-        logger.info('Sending new campaigns email to: ' + recipient.email_address)
-        body = self._jinja_environment.get_template('new_campaigns.html').render(
-            user={
-                'id': recipient.id,
-                'timezone': recipient.timezone
-            },
-            campaigns=campaigns
+    def _send_initial_email(self, user, campaigns):
+        logger.info('Sending initial email to: ' + user['email'])
+        body = self._jinja_environment.get_template('message_and_campaigns_list.html').render(
+            user=user,
+            domain=self._domain,
+            campaigns=campaigns,
+            message='You have subscribed to Twitch Drop Campaign notifications.'
         )
-        self._send(recipient.email_address, 'New Twitch Drop Campaigns!', body)
+        self.send(user['email'], 'Active Twitch Drop Campaigns', body)
 
-    def _send_new_games_email(self, recipient: EmailRecipient, games):
-        logger.info('Sending new games email to: ' + recipient.email_address)
-        body = self._jinja_environment.get_template('new_games.html').render(
-            games=games
+    def _send_update_email(self, user, campaigns):
+        logger.info('Sending update email to: ' + user['email'])
+        body = self._jinja_environment.get_template('message_and_campaigns_list.html').render(
+            user=user,
+            domain=self._domain,
+            campaigns=campaigns,
+            message='You recently updated your preferences.'
         )
-        self._send(recipient.email_address, 'New Games', body)
+        self.send(user['email'], 'Active Twitch Drop Campaigns', body)
