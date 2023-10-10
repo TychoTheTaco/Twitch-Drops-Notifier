@@ -6,6 +6,9 @@ COPY ./twitch_drops_watchdog ./twitch_drops_watchdog
 COPY ./requirements.txt .
 COPY ./setup.py .
 
+# Install requirements
+RUN pip install -r requirements.txt
+
 # Install app
 RUN pip install .
 
