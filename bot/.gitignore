@@ -1,0 +1,11 @@
+# Credentials
+credentials
+
+# Local database
+database.json
+
+# Config
+config.json
+
+# Build output
+twitch_drops_watchdog.egg-info

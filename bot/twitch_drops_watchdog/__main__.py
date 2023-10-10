@@ -4,7 +4,7 @@ import logging
 from pathlib import Path
 from typing import Any, Dict, List
 
-from twitch_drops_watchdog.notifiers.discord import DiscordNotifier, DiscordSubscriber
+from .notifiers.discord import DiscordNotifier, DiscordSubscriber
 from .notifiers.email import EmailNotifier, EmailSubscriber
 from .notifiers.notifier import Notifier, BufferedNotifier, EventMapType
 from .twitch import Client
@@ -17,17 +17,16 @@ def logging_filter(record):
     :param record:
     :return:
     """
-    names = ['twitch_drops_watchdog', '__main__', 'twitch_drops_notifier']
+    names = ['twitch_drops_watchdog', '__main__']
     for name in names:
-        if name in record.name or name in record.pathname:
+        if name in record.name:
             return True
     return False
 
 
 # Set up logging
 logger = logging.getLogger(__name__)
-logging.basicConfig(format='%(asctime)s [%(name)s] [%(levelname)s] %(message)s', level=logging.DEBUG,
-                    datefmt='%m/%d/%Y %H:%M:%S')
+logging.basicConfig(format='%(asctime)s [%(name)s] [%(levelname)s] %(message)s', level=logging.DEBUG, datefmt='%m/%d/%Y %H:%M:%S')
 logging.getLogger().handlers[0].addFilter(logging_filter)
 
 
@@ -52,7 +51,6 @@ class ConfigurationParser:
 
                 discord_notifier = DiscordNotifier()
 
-                subscribers = []
                 for subscriber_json in subscribers_json:
 
                     details = self._parse_common_subscriber_details(subscriber_json)

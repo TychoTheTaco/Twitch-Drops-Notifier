@@ -5,7 +5,6 @@ import logging
 import time
 from abc import ABC
 from pathlib import Path
-from typing import Set
 
 from .twitch import Client, DropCampaign, Game
 
@@ -159,10 +158,10 @@ class TwitchDropsWatchdog:
                 new_games.append(game)
 
         # Notify listeners
-        if len(new_campaigns) > 0:
-            _call_all(self._on_new_campaigns_listeners, list(new_campaigns))
         if len(new_games) > 0:
             _call_all(self._on_new_games_listeners, list(new_games))
+        if len(new_campaigns) > 0:
+            _call_all(self._on_new_campaigns_listeners, list(new_campaigns))
 
         # Save database
         self._database.save()

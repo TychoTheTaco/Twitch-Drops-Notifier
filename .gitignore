@@ -1,14 +1,2 @@
 # Python virtual environment
 venv
-
-# Credentials
-credentials
-
-# Local database
-database.json
-
-# Credentials
-gmail.pickle
-
-# Config
-config.json

@@ -1,17 +1,15 @@
+import argparse
 import datetime
 import json
 import logging
-import argparse
 from pathlib import Path
 
 from google.cloud import firestore
 
-from twitch_drops_watchdog import TwitchDropsWatchdog
-from twitch_drops_watchdog.notifiers.email import EmailNotifier
-from notifiers.email import FirestoreEmailSubscriberIterator, WebServiceEmailNotifier
 from twitch_drops_watchdog.notifiers.notifier import BufferedNotifier
-from twitch_drops_watchdog.twitch import Client, Game, DropCampaign
-from twitch_drops_watchdog.twitch_drops_watchdog import Database
+from twitch_drops_watchdog.twitch import DropCampaign, Client, Game
+from twitch_drops_watchdog.twitch_drops_watchdog import Database, TwitchDropsWatchdog
+from web_service.notifiers.email import FirestoreEmailSubscriberIterator, WebServiceEmailNotifier
 
 
 def logging_filter(record):

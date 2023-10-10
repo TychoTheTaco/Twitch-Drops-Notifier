@@ -7,3 +7,7 @@
 #   $ gcloud topic gcloudignore
 #
 .gcloudignore
+
+deploy.bat
+README.md
+venv
