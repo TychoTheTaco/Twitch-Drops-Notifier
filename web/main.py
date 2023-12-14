@@ -41,6 +41,18 @@ def get_user(user_id: str) -> Optional[Dict[str, Any]]:
     return None
 
 
+@app.route("/_ah/warmup")
+def warmup():
+    """Served stub function returning no content.
+
+    Your warmup logic can be implemented here (e.g. set up a database connection pool)
+
+    Returns:
+        An empty string, an HTTP code 200, and an empty object.
+    """
+    return "", 200, {}
+
+
 @app.route('/')
 def index():
     # Find user

@@ -8,8 +8,9 @@
       <excludeFolder url="file://$MODULE_DIR$/bot/twitch_drops_watchdog.egg-info" />
       <excludeFolder url="file://$MODULE_DIR$/bot/venv" />
       <excludeFolder url="file://$MODULE_DIR$/web_service/venv" />
+      <excludeFolder url="file://$MODULE_DIR$/web/venv" />
     </content>
-    <orderEntry type="jdk" jdkName="Python 3.11 (Twitch-Drops-Notifier)" jdkType="Python SDK" />
+    <orderEntry type="jdk" jdkName="Python 3.11 (Twitch-Drops-Notifier) (3)" jdkType="Python SDK" />
     <orderEntry type="sourceFolder" forTests="false" />
   </component>
   <component name="TemplatesService">

@@ -11,3 +11,10 @@ handlers:
   # the entire handlers section) when there are no static files defined.
 - url: /.*
   script: auto
+
+automatic_scaling:
+  min_instances: 1
+  max_instances: 1
+
+inbound_services:
+  - warmup
