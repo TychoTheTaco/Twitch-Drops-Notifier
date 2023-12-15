@@ -18,3 +18,5 @@ automatic_scaling:
 
 inbound_services:
   - warmup
+
+entrypoint: gunicorn -b :$PORT -w 1 main:app
