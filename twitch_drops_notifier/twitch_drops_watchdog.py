@@ -6,13 +6,10 @@ from google.cloud import firestore
 
 from . import twitch
 from . import utils
+from .utils import get_datetime
 
 # Set up logging
 logger = logging.getLogger(__name__)
-
-
-def get_datetime(timestamp):
-    return datetime.datetime.strptime(timestamp, "%Y-%m-%dT%H:%M:%S%z")
 
 
 class TwitchDropsWatchdog:

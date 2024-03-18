@@ -102,7 +102,6 @@ class Client:
             return None
 
         response_json = response.json()
-        print(response_json)
 
         try:
             return [x['data']['user']['dropCampaign'] for x in response_json]

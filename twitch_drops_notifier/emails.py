@@ -10,14 +10,10 @@ from jinja2 import Environment, FileSystemLoader
 from jinja2.filters import FILTERS
 
 from .twitch_drops_watchdog import TwitchDropsWatchdog
-
+from .utils import get_datetime
 
 # Set up logging
 logger = logging.getLogger(__name__)
-
-
-def get_datetime(timestamp):
-    return datetime.datetime.strptime(timestamp, "%Y-%m-%dT%H:%M:%S%z")
 
 
 def convert_time(value, user):
